@@ -34,7 +34,6 @@
         <div class="header-inner nav-inner">
             <nav>
                 <a href="{{ url_for('inicio') }}">Inicio</a>
-                <a href="#categorias">Categorías</a>
                 <a href="#ofertas">Bajaron de precio</a>
                 <a href="#tiendas">Tiendas</a>
             </nav>
@@ -117,8 +116,17 @@
     <section class="quick-categories" id="categorias">
         <div class="quick-title"><span>Categorías populares</span><small>Entrá directo a lo que buscás</small></div>
         {% for categoria in categorias_populares[:6] %}
+            {% set categoria_lower = categoria.nombre|lower %}
+            {% set icon_id = 'generic' %}
+            {% if 'procesador' in categoria_lower or 'cpu' in categoria_lower %}{% set icon_id = 'procesadores' %}
+            {% elif 'gabinete' in categoria_lower %}{% set icon_id = 'gabinetes' %}
+            {% elif 'mouse' in categoria_lower %}{% set icon_id = 'mouse' %}
+            {% elif 'placa de video' in categoria_lower or 'gpu' in categoria_lower or 'video' in categoria_lower %}{% set icon_id = 'placas-video' %}
+            {% elif 'almacenamiento' in categoria_lower or 'disco' in categoria_lower or 'ssd' in categoria_lower %}{% set icon_id = 'almacenamiento' %}
+            {% elif 'otro' in categoria_lower %}{% set icon_id = 'otros' %}
+            {% endif %}
         <a class="quick-category" href="{{ url_for('inicio', categoria=categoria.nombre) }}">
-            <span class="quick-icon">{{ categoria.nombre[:2]|upper }}</span>
+            <svg class="quick-category-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename='category-icons.svg') }}#{{ icon_id }}"></use></svg>
             <strong>{{ categoria.nombre }}</strong>
             <small>{{ '{:,.0f}'.format(categoria.productos).replace(',', '.') }} productos</small>
         </a>
