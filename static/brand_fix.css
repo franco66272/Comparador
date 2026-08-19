@@ -1,0 +1,7 @@
+.brand-logo{width:42px;height:42px;display:block;object-fit:contain;flex:0 0 42px;max-width:42px;max-height:42px}
+.brand{min-width:0;white-space:nowrap;line-height:1}
+.header-main{grid-template-columns:minmax(190px,230px) minmax(340px,1fr) auto;min-height:68px}
+.header-top .header-inner{padding-top:10px;padding-bottom:10px}
+.searchbar{min-width:0}
+@media (max-width:900px){.brand{font-size:19px}.brand-logo{width:36px;height:36px;flex-basis:36px;max-width:36px;max-height:36px}.header-main{grid-template-columns:auto minmax(0,1fr) auto;gap:12px}.header-inner{padding-left:14px;padding-right:14px}}
+@media (max-width:650px){.header-main{grid-template-columns:auto auto;justify-content:space-between}.searchbar{grid-column:1/-1;grid-row:2}.header-top .header-inner{padding-top:9px;padding-bottom:9px}.brand{font-size:18px}}
