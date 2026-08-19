@@ -10,6 +10,26 @@
         'TecnoRadar - ¿Qué estás buscando?',
     ];
 
+    function aplicarLogo() {
+        document.querySelectorAll('.brand-mark').forEach(function (elemento) {
+            elemento.innerHTML = `
+                <svg class="tecnoradar-logo-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+                    <circle cx="24" cy="24" r="17" fill="none" stroke="#38bdf8" stroke-width="3" opacity="0.95"/>
+                    <circle cx="24" cy="24" r="10" fill="none" stroke="#2563eb" stroke-width="3" opacity="0.95"/>
+                    <circle cx="24" cy="24" r="3.5" fill="#22c55e"/>
+                    <path d="M24 24 L39 11 A21 21 0 0 1 42 18 Z" fill="#38bdf8"/>
+                    <path d="M24 24 L35 35" stroke="#2563eb" stroke-width="3" stroke-linecap="round"/>
+                </svg>`;
+            elemento.style.width = '36px';
+            elemento.style.height = '36px';
+            elemento.style.borderRadius = '0';
+            elemento.style.background = 'transparent';
+            elemento.style.fontSize = '0';
+            elemento.style.display = 'inline-flex';
+            elemento.style.flexShrink = '0';
+        });
+    }
+
     let indice = 0;
     let temporizador = null;
 
@@ -18,22 +38,8 @@
         indice = (indice + 1) % mensajes.length;
     }
 
-    function aplicarLogoTecnoRadar() {
-        const svg = `<svg viewBox="0 0 30 30" width="22" height="22" aria-hidden="true" focusable="false">
-            <circle cx="15" cy="15" r="10.5" fill="none" stroke="rgba(255,255,255,.95)" stroke-width="1.6"/>
-            <circle cx="15" cy="15" r="5.5" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2"/>
-            <path d="M15 15 L23.5 7.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-            <path d="M15 15 L8.2 21.8" stroke="rgba(255,255,255,.45)" stroke-width="1" stroke-linecap="round"/>
-            <circle cx="15" cy="15" r="2.2" fill="#fff"/>
-        </svg>`;
-        document.querySelectorAll('.brand-mark').forEach(function (el) {
-            el.innerHTML = svg;
-            el.setAttribute('aria-label', 'Logo de TecnoRadar');
-        });
-    }
-
     function iniciarTituloDinamico() {
-        aplicarLogoTecnoRadar();
+        aplicarLogo();
         cambiarTitulo();
         temporizador = window.setInterval(cambiarTitulo, 2200);
 
