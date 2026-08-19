@@ -6,6 +6,7 @@
     <title>TecnoRadar - {{ producto.nombre }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='brand_fix.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='price_chart.css') }}">
     <script src="{{ url_for('static', filename='tab_title.js') }}" defer></script>
 </head>
 <body>
@@ -40,14 +41,52 @@
 
     <section class="detail-section"><div class="detail-section-head"><div><div class="eyebrow">SEGUIMIENTO</div><h2>Historial de precios</h2></div><span>{{ historial|length }} registros</span></div>
         {% if historial %}
-        <div class="chart-card"><div class="chart-top"><div><strong>Evolución del precio</strong><span>Registros guardados por TecnoRadar</span></div><span class="chart-current">Actual: ${{ "{:,.0f}".format((historial[-1].precio if historial else producto.precio)).replace(',', '.') }}</span></div><svg id="graficoPrecio" viewBox="0 0 900 320" preserveAspectRatio="none"><path id="lineaPrecio" class="linea-precio" d=""></path><g id="puntosPrecio"></g></svg></div>
+        <div class="price-chart-wrap">
+            <div class="price-chart-head">
+                <div><div class="price-chart-title">Evolución del precio</div><span class="price-chart-subtitle">Historial registrado por TecnoRadar</span></div>
+                <span class="price-chart-current">${{ "{:,.0f}".format((historial[-1].precio if historial else producto.precio)).replace(',', '.') }}</span>
+            </div>
+            <div class="price-chart-stage" id="priceChartStage">
+                <svg id="graficoPrecio" class="price-chart" viewBox="0 0 900 330" preserveAspectRatio="none" role="img" aria-label="Evolución del precio del producto">
+                    <defs><linearGradient id="priceAreaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d45757" stop-opacity=".30"></stop><stop offset="100%" stop-color="#d45757" stop-opacity="0"></stop></linearGradient></defs>
+                    <g id="chartGrid"></g><path id="priceArea" class="price-chart-area" d=""></path><path id="lineaPrecio" class="price-chart-line" d=""></path><g id="chartAxes"></g><g id="puntosPrecio"></g>
+                </svg>
+                <div id="priceTooltip" class="price-chart-tooltip" hidden><span class="price-chart-tooltip-date"></span><span class="price-chart-tooltip-price"></span></div>
+            </div>
+            <div class="price-chart-note">Pasá el cursor por los puntos para consultar el valor registrado.</div>
+        </div>
         <div class="history-card"><div class="history-header"><span>Fecha</span><span>Precio</span><span>Fuente</span></div>{% for item in historial|reverse %}<div class="history-row"><span>{{ item.fecha|replace('T',' ') }}</span><strong>${{ "{:,.0f}".format(item.precio).replace(',', '.') }}</strong><span>{{ item.fuente }}</span></div>{% endfor %}</div>
         {% else %}<div class="empty-state"><h2>Sin historial todavía</h2><p>La primera verificación queda registrada al abrir este producto o al ejecutar el verificador automático.</p></div>{% endif %}
     </section>
 </main>
 <footer class="site-footer"><div class="footer-inner"><div class="footer-brand"><a class="brand footer-brand-link" href="{{ url_for('inicio') }}"><img class="brand-logo" src="{{ url_for('static', filename='tecnoradar-logo.svg') }}" alt="TecnoRadar"><span>TECNORADAR</span></a><p>Compará precios de tecnología antes de comprar.</p></div><div>Fuente oficial · historial de precios · comparación</div></div></footer>
 {% if historial %}<script>
-const serie={{ historial|tojson }};const path=document.getElementById('lineaPrecio');const dots=document.getElementById('puntosPrecio');if(serie.length){const W=900,H=320,p=34,v=serie.map(x=>+x.precio),mn=Math.min(...v),mx=Math.max(...v),r=(mx-mn)||1,X=i=>p+i*((W-2*p)/Math.max(1,serie.length-1)),Y=n=>H-p-((n-mn)/r)*(H-2*p);path.setAttribute('d',serie.map((x,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(+x.precio).toFixed(1)).join(' '));serie.forEach((x,i)=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',X(i));c.setAttribute('cy',Y(+x.precio));c.setAttribute('r','4');c.setAttribute('class','punto-precio');c.setAttribute('title',x.fecha+' · $'+Number(x.precio).toLocaleString('es-AR'));dots.appendChild(c);});}
+const serie={{ historial|tojson }};
+const svg=document.getElementById('graficoPrecio');
+const line=document.getElementById('lineaPrecio');
+const area=document.getElementById('priceArea');
+const dots=document.getElementById('puntosPrecio');
+const grid=document.getElementById('chartGrid');
+const axes=document.getElementById('chartAxes');
+const tooltip=document.getElementById('priceTooltip');
+const stage=document.getElementById('priceChartStage');
+if(svg&&serie.length){
+ const W=900,H=330,left=68,right=24,top=22,bottom=42,plotW=W-left-right,plotH=H-top-bottom;
+ const values=serie.map(x=>Number(x.precio)).filter(Number.isFinite);
+ let mn=Math.min(...values),mx=Math.max(...values);
+ if(mn===mx){mn-=Math.max(1,mn*.05);mx+=Math.max(1,mx*.05)}
+ const pad=(mx-mn)*.08;mn=Math.max(0,mn-pad);mx+=pad;
+ const X=i=>left+(serie.length===1?plotW/2:i*(plotW/(serie.length-1)));
+ const Y=v=>top+((mx-v)/(mx-mn))*plotH;
+ const fmt=n=>'$'+Math.round(n).toLocaleString('es-AR');
+ const shortDate=s=>{const d=new Date(String(s).replace(' ','T'));if(Number.isNaN(d.getTime()))return String(s).slice(0,10);return d.toLocaleDateString('es-AR',{day:'numeric',month:'short'}).replace('.','')};
+ const smoothPath=pts=>{if(pts.length===1)return `M ${pts[0][0]} ${pts[0][1]}`;let d=`M ${pts[0][0]} ${pts[0][1]}`;for(let i=1;i<pts.length;i++){const p0=pts[i-1],p1=pts[i],cx=(p0[0]+p1[0])/2;d+=` C ${cx} ${p0[1]}, ${cx} ${p1[1]}, ${p1[0]} ${p1[1]}`;}return d};
+ const pts=serie.map((x,i)=>[X(i),Y(Number(x.precio))]);
+ for(let i=0;i<5;i++){const val=mn+(mx-mn)*(i/4),y=Y(val);const l=document.createElementNS('http://www.w3.org/2000/svg','line');l.setAttribute('x1',left);l.setAttribute('x2',W-right);l.setAttribute('y1',y);l.setAttribute('y2',y);l.setAttribute('class','price-chart-grid');grid.appendChild(l);const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('x',left-10);t.setAttribute('y',y+4);t.setAttribute('text-anchor','end');t.setAttribute('class','price-chart-axis');t.textContent=fmt(val);axes.appendChild(t)}
+ const labelEvery=Math.max(1,Math.ceil(serie.length/6));serie.forEach((x,i)=>{if(i%labelEvery!==0&&i!==serie.length-1)return;const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.setAttribute('x',X(i));t.setAttribute('y',H-12);t.setAttribute('text-anchor','middle');t.setAttribute('class','price-chart-axis');t.textContent=shortDate(x.fecha);axes.appendChild(t)});
+ const lineD=smoothPath(pts);line.setAttribute('d',lineD);area.setAttribute('d',`${lineD} L ${pts[pts.length-1][0]} ${H-bottom} L ${pts[0][0]} ${H-bottom} Z`);
+ serie.forEach((x,i)=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',X(i));c.setAttribute('cy',Y(Number(x.precio)));c.setAttribute('r',serie.length<12?'5':'3.5');c.setAttribute('class','price-chart-dot');c.addEventListener('mouseenter',()=>{const rect=svg.getBoundingClientRect(),stageRect=stage.getBoundingClientRect(),scaleX=rect.width/W,scaleY=rect.height/H;tooltip.hidden=false;tooltip.querySelector('.price-chart-tooltip-date').textContent=shortDate(x.fecha);tooltip.querySelector('.price-chart-tooltip-price').textContent=fmt(Number(x.precio));tooltip.style.left=(X(i)*scaleX+rect.left-stageRect.left)+'px';tooltip.style.top=(Y(Number(x.precio))*scaleY+rect.top-stageRect.top)+'px'});c.addEventListener('mouseleave',()=>tooltip.hidden=true);dots.appendChild(c)});
+}
 </script>{% endif %}
 </body>
 </html>
