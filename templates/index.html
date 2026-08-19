@@ -11,7 +11,7 @@
 <header class="site-header">
     <div class="header-top">
         <div class="header-inner header-main">
-            <a class="brand" href="{{ url_for('inicio') }}"><span class="brand-mark">TR</span><span>TECNORADAR</span></a>
+            <a class="brand" href="{{ url_for('inicio') }}"><img class="brand-logo" src="{{ url_for('static', filename='tecnoradar-logo.svg') }}" alt="TecnoRadar"><span>TECNORADAR</span></a>
             <form class="searchbar" method="get" action="{{ url_for('inicio') }}">
                 <input type="text" name="q" value="{{ busqueda }}" placeholder="Buscá productos, marcas o modelos..." autocomplete="off">
                 <button type="submit">Buscar</button>
@@ -182,7 +182,7 @@
 
 <footer class="site-footer">
     <div class="footer-inner">
-        <div class="footer-brand"><a class="brand footer-brand-link" href="{{ url_for('inicio') }}"><span class="brand-mark">TR</span><span>TECNORADAR</span></a><p>Compará precios de tecnología antes de comprar.</p></div>
+        <div class="footer-brand"><a class="brand footer-brand-link" href="{{ url_for('inicio') }}"><img class="brand-logo" src="{{ url_for('static', filename='tecnoradar-logo.svg') }}" alt="TecnoRadar"><span>TECNORADAR</span></a><p>Compará precios de tecnología antes de comprar.</p></div>
         <div><strong>Explorar</strong><a href="#categorias">Categorías</a><a href="#ofertas">Bajaron de precio</a><a href="#tiendas">Tiendas</a></div>
         <div><strong>Datos</strong><span>{{ '{:,.0f}'.format(total_productos).replace(',', '.') }} productos</span><span>{{ total_tiendas }} tiendas</span><span>Actualizado {{ ultima_actualizacion }}</span></div>
     </div>
