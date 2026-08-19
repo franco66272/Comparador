@@ -37,7 +37,6 @@
                 <a href="#ofertas">Bajaron de precio</a>
                 <a href="#tiendas">Tiendas</a>
             </nav>
-            <span class="nav-meta">{{ '{:,.0f}'.format(total_productos).replace(',', '.') }} productos · {{ total_tiendas }} tiendas</span>
         </div>
     </div>
 </header>
@@ -179,13 +178,6 @@
             {% endfor %}
         </div>
     </section>
-
-    <section class="trust-band">
-        <div><strong>{{ '{:,.0f}'.format(total_productos).replace(',', '.') }}</strong><span>productos</span></div>
-        <div><strong>{{ total_tiendas }}</strong><span>tiendas</span></div>
-        <div><strong>Historial</strong><span>de precios por producto</span></div>
-        <div><strong>Verificación</strong><span>periódica de precios</span></div>
-    </section>
 </main>
 {% endif %}
 
@@ -193,7 +185,6 @@
     <div class="footer-inner">
         <div class="footer-brand"><a class="brand footer-brand-link" href="{{ url_for('inicio') }}"><img class="brand-logo" src="{{ url_for('static', filename='tecnoradar-logo.svg') }}" alt="TecnoRadar"><span>TECNORADAR</span></a><p>Compará precios de tecnología antes de comprar.</p></div>
         <div><strong>Explorar</strong><a href="#categorias">Categorías</a><a href="#ofertas">Bajaron de precio</a><a href="#tiendas">Tiendas</a></div>
-        <div><strong>Datos</strong><span>{{ '{:,.0f}'.format(total_productos).replace(',', '.') }} productos</span><span>{{ total_tiendas }} tiendas</span><span>Actualizado {{ ultima_actualizacion }}</span></div>
     </div>
 </footer>
 </body>
