@@ -1,0 +1,17 @@
+<article class="product-card">
+    <a class="product-image" href="{{ url_for('producto_detalle', codigo=clave_producto(producto)) }}">
+        {% if producto.imagen and imagen_utilizable(producto.imagen) %}
+            <img src="{{ producto.imagen }}" alt="{{ producto.nombre }}" loading="lazy" referrerpolicy="no-referrer">
+        {% elif producto.url %}
+            <img src="{{ url_for('resolver_imagen', imagen=producto.imagen or '', producto=producto.url) }}" alt="{{ producto.nombre }}" loading="lazy" referrerpolicy="no-referrer">
+        {% else %}<div class="sin-imagen">Sin imagen</div>{% endif %}
+    </a>
+    <div class="product-body">
+        {% if producto.descuento_pct %}<span class="deal-badge">-{{ producto.descuento_pct }}%</span>{% endif %}
+        <a class="product-store" href="{{ url_for('inicio', tienda=producto.tienda) }}">{{ nombre_tienda_visible(producto.tienda) }}</a>
+        <a class="product-name" href="{{ url_for('producto_detalle', codigo=clave_producto(producto)) }}">{{ producto.nombre }}</a>
+        {% if producto.precio_anterior and producto.precio_anterior > producto.precio %}<div class="old-price">${{ "{:,.0f}".format(producto.precio_anterior).replace(',', '.') }}</div>{% endif %}
+        <div class="current-price">${{ "{:,.0f}".format(producto.precio).replace(',', '.') }}</div>
+        <div class="product-foot"><span class="stock-dot {% if producto.stock and producto.stock > 0 %}on{% endif %}"></span>{% if producto.stock and producto.stock > 0 %}En stock{% else %}Sin stock{% endif %}<a href="{{ url_for('producto_detalle', codigo=clave_producto(producto)) }}">Ver producto →</a></div>
+    </div>
+</article>

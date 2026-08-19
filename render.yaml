@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: tecnoradar
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    autoDeploy: false
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: TECNORADAR_READ_ONLY
+        value: "1"
+      - key: TECNORADAR_DATA_BASE_URL
+        value: https://raw.githubusercontent.com/franco66272/compararadar/main
+      - key: TECNORADAR_DATA_CACHE_TTL
+        value: "300"

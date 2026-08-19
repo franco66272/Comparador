@@ -1,0 +1,35 @@
+CAMBIO UNIVERSAL DEL COMPARADOR
+
+Nuevas capas:
+- cada extractor automático corre en un proceso aislado;
+- timeout duro de 90s por tienda;
+- timeout HTTP de 12s;
+- máximo 80 páginas totales;
+- máximo 12 páginas por fuente;
+- máximo 20 fuentes por tienda;
+- máximo 5000 productos;
+- circuit breaker después de 2 páginas consecutivas sin resultados;
+- filtro de productos irrelevantes;
+- priorización de categorías sobre URLs de productos;
+- logs separados por tienda en logs_auto/;
+- si una tienda falla, validación conserva el último catálogo válido.
+
+Archivos nuevos/modificados:
+- actualizar.py
+- extractores/auto_generico.py
+- extractores/runner_auto.py
+- agregar_lote.py
+- compactar_registro.py
+
+Instalación en el proyecto existente:
+1) Reemplazar esos archivos conservando config y JSON de productos.
+2) Ejecutar:
+   ..\venv\Scripts\python.exe -m py_compile actualizar.py
+   ..\venv\Scripts\python.exe -m py_compile extractores\auto_generico.py
+   ..\venv\Scripts\python.exe -m py_compile extractores\runner_auto.py
+3) Opcional para reducir el JSON de configuración existente:
+   ..\venv\Scripts\python.exe compactar_registro.py
+4) Probar:
+   ..\venv\Scripts\python.exe actualizar.py
+
+No se modifica ningún JSON de catálogo de productos en este paquete.

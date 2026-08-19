@@ -1,0 +1,194 @@
+"""
+Validador y merge incremental por tienda.
+
+Nunca elimina un catálogo sano por una extracción sospechosamente parcial.
+Además devuelve estado de salud y métricas comparables entre ejecuciones.
+"""
+import json, re
+import os
+from collections import Counter
+
+CAIDA_MAXIMA_PERMITIDA = 0.50
+PRECIO_MINIMO_RAZONABLE = 100
+
+
+def cargar_json_anterior(path):
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, list) else []
+        except (OSError, json.JSONDecodeError):
+            return []
+    return []
+
+
+def _clave(p):
+    return str(p.get("id_producto") or p.get("url") or "").strip()
+
+
+def _limpiar(productos):
+    vistos = set()
+    limpios = []
+    duplicados = 0
+    descartados = 0
+
+    for p in productos or []:
+        if not isinstance(p, dict):
+            continue
+        clave = _clave(p)
+        precio = p.get("precio")
+        try:
+            precio = int(float(precio))
+        except (TypeError, ValueError):
+            precio = 0
+        if not clave or precio < PRECIO_MINIMO_RAZONABLE:
+            descartados += 1
+            continue
+        if clave in vistos:
+            duplicados += 1
+            continue
+        vistos.add(clave)
+        p["precio"] = precio
+        p.setdefault("stock", 0)
+        limpios.append(p)
+
+    return limpios, duplicados, descartados
+
+
+def _merge(anterior, nuevos):
+    index = {}
+    orden = []
+
+    for p in anterior:
+        clave = _clave(p)
+        if clave and clave not in index:
+            index[clave] = p
+            orden.append(clave)
+
+    for p in nuevos:
+        clave = _clave(p)
+        if not clave:
+            continue
+        if clave not in index:
+            orden.append(clave)
+        index[clave] = p
+
+    return [index[k] for k in orden]
+
+
+def _estadisticas(anterior, nuevos, finales):
+    old = {_clave(p): p for p in anterior if _clave(p)}
+    new = {_clave(p): p for p in nuevos if _clave(p)}
+
+    nuevos_ids = set(new) - set(old)
+    eliminados_ids = set(old) - set(new)
+    actualizados_ids = {
+        k for k in set(old) & set(new)
+        if old[k].get("precio") != new[k].get("precio")
+        or old[k].get("stock") != new[k].get("stock")
+        or old[k].get("imagen") != new[k].get("imagen")
+    }
+    return {
+        "productos_nuevos": len(nuevos_ids),
+        "productos_actualizados": len(actualizados_ids),
+        "productos_eliminados": len(eliminados_ids),
+        "productos_finales": len(finales),
+    }
+
+
+def validar_resultado(resultado, path_json):
+    tienda = resultado.get("tienda") or path_json.stem
+    warnings = list(resultado.get("warnings") or [])
+    anterior = cargar_json_anterior(path_json)
+    cantidad_anterior = len(anterior)
+
+    nuevos, duplicados, descartados = _limpiar(resultado.get("productos") or [])
+    if duplicados:
+        warnings.append(f"{duplicados} duplicados eliminados")
+    if descartados:
+        warnings.append(f"{descartados} productos inválidos descartados")
+
+    salud = str(resultado.get("salud") or "").upper()
+    completitud = str(resultado.get("completitud") or "").lower()
+
+    if not resultado.get("ok", False) or not nuevos:
+        salud_final = salud if salud else "FAILED"
+        if cantidad_anterior:
+            warnings.append(
+                f"Extracción no utilizable; se conserva el catálogo anterior ({cantidad_anterior})"
+            )
+            stats = _estadisticas(anterior, [], anterior)
+            return anterior, {
+                "ok": False,
+                "tienda": tienda,
+                "productos": cantidad_anterior,
+                "salud": salud_final,
+                "completitud": "baja",
+                "fuente": "catalogo_anterior",
+                "warnings": warnings,
+                **stats,
+            }
+
+        warnings.append("No existe catálogo anterior para usar como fallback")
+        return [], {
+            "ok": False,
+            "tienda": tienda,
+            "productos": 0,
+            "salud": salud_final or "FAILED",
+            "completitud": "baja",
+            "fuente": "sin_catalogo",
+            "warnings": warnings,
+            "productos_nuevos": 0,
+            "productos_actualizados": 0,
+            "productos_eliminados": 0,
+            "productos_finales": 0,
+        }
+
+    # Si la extracción es claramente parcial o cayó por debajo del 50%, se fusiona.
+    porcentaje = (len(nuevos) / cantidad_anterior) if cantidad_anterior else 1.0
+    parcial = (
+        completitud in {"baja", "media"}
+        or salud in {"PARTIAL", "TIMEOUT", "BLOCKED", "DISCOVERY_FAILED", "NO_SOURCE"}
+        or (cantidad_anterior and porcentaje < CAIDA_MAXIMA_PERMITIDA)
+    )
+
+    if parcial and cantidad_anterior:
+        finales = _merge(anterior, nuevos)
+        warnings.append(
+            f"Extracción parcial ({len(nuevos)} nuevos vs {cantidad_anterior} anteriores); "
+            f"se fusiona para evitar pérdidas."
+        )
+        stats = _estadisticas(anterior, nuevos, finales)
+        # En una extracción parcial no declaramos productos eliminados: la
+        # ausencia de un producto en la muestra no demuestra que haya salido
+        # del catálogo de la tienda.
+        stats["productos_eliminados"] = 0
+        return finales, {
+            "ok": True,
+            "tienda": tienda,
+            "productos": len(finales),
+            "salud": salud or "PARTIAL",
+            "completitud": completitud or "media",
+            "fuente": "fusion_parcial",
+            "warnings": warnings,
+            **stats,
+        }
+
+    # Healthy: el catálogo nuevo reemplaza al anterior. Es la única situación
+    # en la que se consideran eliminados los productos que ya no aparecen.
+    sin_imagen = sum(1 for p in nuevos if not p.get("imagen"))
+    if nuevos and sin_imagen > len(nuevos) * 0.30:
+        warnings.append(f"{sin_imagen}/{len(nuevos)} productos sin imagen (>30%)")
+
+    stats = _estadisticas(anterior, nuevos, nuevos)
+    return nuevos, {
+        "ok": True,
+        "tienda": tienda,
+        "productos": len(nuevos),
+        "salud": salud or "HEALTHY",
+        "completitud": completitud or "alta",
+        "fuente": "extraccion_nueva",
+        "warnings": warnings,
+        **stats,
+    }

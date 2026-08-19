@@ -1,0 +1,18 @@
+VERSION UNIVERSAL V2
+
+CAMBIOS PRINCIPALES
+1. Scrapy se ejecuta siempre con el Python del venv: `python -m scrapy`.
+2. Las tiendas automáticas se ejecutan en paralelo (máximo 5) y cada una tiene timeout propio.
+3. Una tienda colgada ya no puede bloquear todo el comparador.
+4. Eliminado el corte artificial en 300 productos que provocaba falsos fallos por caída >50%.
+5. Aumentados los límites internos de páginas/fuentes, pero con circuit breaker y presupuesto duro.
+6. Las categorías son prioritarias; los productos individuales son fallback.
+7. Se añadió extracción por enlaces de producto cuando el HTML no usa tarjetas estándar.
+8. Se conservan los URLs del registro; `compactar_registro.py` ya NO destruye ni recorta `tiendas_auto.json`.
+9. Se añadió `fuentes_prioritarias.json` como índice auxiliar no destructivo.
+10. El filtro de relevancia usa señales de producto y descarta categorías ajenas.
+11. El paquete incluye el registro completo previo al recorte para recuperar las fuentes perdidas por la versión anterior.
+
+IMPORTANTE
+- No ejecutar `compactar_registro.py` esperando que recorte el registro: ahora solo genera el índice auxiliar.
+- Antes de la primera actualización, ejecutar `preparar_entorno.py` con el Python del venv.

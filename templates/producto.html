@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TecnoRadar - {{ producto.nombre }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='tab_title.js') }}" defer></script>
+</head>
+<body>
+<header class="site-header">
+    <div class="header-top"><div class="header-inner header-main">
+        <a class="brand" href="{{ url_for('inicio') }}"><span class="brand-mark">TR</span><span>TECNORADAR</span></a>
+        <form class="searchbar" method="get" action="{{ url_for('inicio') }}"><input type="text" name="q" placeholder="Buscá productos, marcas o modelos..." autocomplete="off"><button type="submit">Buscar</button></form>
+        <details class="category-menu"><summary><span class="menu-icon">☰</span><span class="desktop-only">Categorías</span><span class="mobile-only">Menú</span></summary><div class="category-panel"><a href="{{ url_for('inicio') }}" class="category-item category-all"><span>Ver todo</span></a>{% for categoria in categorias %}<a href="{{ url_for('inicio', categoria=categoria.nombre) }}" class="category-item"><span>{{ categoria.nombre }}</span><small>{{ '{:,.0f}'.format(categoria.productos).replace(',', '.') }}</small></a>{% endfor %}</div></details>
+    </div></div>
+    <div class="header-nav"><div class="header-inner nav-inner"><nav><a href="{{ url_for('inicio') }}">Inicio</a><a href="{{ url_for('inicio') }}">Categoría</a><a href="{{ url_for('inicio', tienda=producto.tienda) }}">{{ nombre_tienda_visible(producto.tienda) }}</a></nav><span class="nav-meta">Producto verificado desde la tienda oficial</span></div></div>
+</header>
+
+<main class="product-page">
+    <div class="breadcrumb"><a href="{{ url_for('inicio') }}">Inicio</a><span>›</span><a href="{{ url_for('inicio', tienda=producto.tienda) }}">{{ nombre_tienda_visible(producto.tienda) }}</a><span>›</span><strong>Producto</strong></div>
+    <section class="product-spotlight">
+        <div class="detail-media">
+            {% set foto = detalle.get('imagen') or producto.imagen %}
+            {% if foto and imagen_utilizable(foto) %}<img src="{{ foto }}" alt="{{ producto.nombre }}" referrerpolicy="no-referrer">{% elif producto.url %}<img src="{{ url_for('resolver_imagen', imagen=producto.imagen or '', producto=producto.url) }}" alt="{{ producto.nombre }}" referrerpolicy="no-referrer">{% else %}<div class="sin-imagen">Sin imagen</div>{% endif %}
+        </div>
+        <div class="detail-summary">
+            <div class="detail-store-row"><span class="detail-store">{{ nombre_tienda_visible(producto.tienda) }}</span><span class="verified-pill">✓ Fuente oficial</span></div>
+            <h1>{{ producto.nombre }}</h1>
+            <div class="detail-meta"><span class="stock-label {% if producto.stock and producto.stock > 0 %}ok{% endif %}">{% if producto.stock and producto.stock > 0 %}En stock{% else %}Sin stock{% endif %}</span><span>Última verificación: {{ detalle.get('verificado_en', 'Aún no verificado') }}</span></div>
+            {% set precio_actual = detalle.get('precio_verificado') or producto.precio %}
+            <div class="price-panel"><span>Precio actual</span><strong>${{ "{:,.0f}".format(precio_actual).replace(',', '.') }}</strong>{% if producto.precio_anterior and producto.precio_anterior > precio_actual %}<em>-{{ ((1 - precio_actual / producto.precio_anterior) * 100)|round|int }}%</em>{% endif %}</div>
+            {% if detalle.get('precio_verificado') and detalle.get('precio_verificado') != producto.precio %}<div class="price-warning">El precio oficial cambió respecto del catálogo guardado. La verificación está incorporando el nuevo valor.</div>{% endif %}
+            <div class="detail-actions"><a class="official-btn" href="{{ producto.url }}" target="_blank" rel="noopener noreferrer">Comprar en {{ nombre_tienda_visible(producto.tienda) }} ↗</a><a class="secondary-btn" href="{{ url_for('inicio', tienda=producto.tienda) }}">Ver más de esta tienda</a></div>
+        </div>
+    </section>
+
+    <section class="detail-section"><div class="detail-section-head"><div><div class="eyebrow">DEL VENDEDOR</div><h2>Descripción</h2></div><span>Información de la página oficial</span></div><div class="description-box">{{ detalle.get('descripcion') or 'La descripción se obtiene directamente de la página oficial cuando TecnoRadar verifica el producto.' }}</div></section>
+
+    <section class="detail-section"><div class="detail-section-head"><div><div class="eyebrow">SEGUIMIENTO</div><h2>Historial de precios</h2></div><span>{{ historial|length }} registros</span></div>
+        {% if historial %}
+        <div class="chart-card"><div class="chart-top"><div><strong>Evolución del precio</strong><span>Registros guardados por TecnoRadar</span></div><span class="chart-current">Actual: ${{ "{:,.0f}".format((historial[-1].precio if historial else producto.precio)).replace(',', '.') }}</span></div><svg id="graficoPrecio" viewBox="0 0 900 320" preserveAspectRatio="none"><path id="lineaPrecio" class="linea-precio" d=""></path><g id="puntosPrecio"></g></svg></div>
+        <div class="history-card"><div class="history-header"><span>Fecha</span><span>Precio</span><span>Fuente</span></div>{% for item in historial|reverse %}<div class="history-row"><span>{{ item.fecha|replace('T',' ') }}</span><strong>${{ "{:,.0f}".format(item.precio).replace(',', '.') }}</strong><span>{{ item.fuente }}</span></div>{% endfor %}</div>
+        {% else %}<div class="empty-state"><h2>Sin historial todavía</h2><p>La primera verificación queda registrada al abrir este producto o al ejecutar el verificador automático.</p></div>{% endif %}
+    </section>
+</main>
+<footer class="site-footer"><div class="footer-inner"><div class="footer-brand"><a class="brand footer-brand-link" href="{{ url_for('inicio') }}"><span class="brand-mark">TR</span><span>TECNORADAR</span></a><p>Compará precios de tecnología antes de comprar.</p></div><div>Fuente oficial · historial de precios · comparación</div></div></footer>
+{% if historial %}<script>
+const serie={{ historial|tojson }};const path=document.getElementById('lineaPrecio');const dots=document.getElementById('puntosPrecio');if(serie.length){const W=900,H=320,p=34,v=serie.map(x=>+x.precio),mn=Math.min(...v),mx=Math.max(...v),r=(mx-mn)||1,X=i=>p+i*((W-2*p)/Math.max(1,serie.length-1)),Y=n=>H-p-((n-mn)/r)*(H-2*p);path.setAttribute('d',serie.map((x,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(+x.precio).toFixed(1)).join(' '));serie.forEach((x,i)=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',X(i));c.setAttribute('cy',Y(+x.precio));c.setAttribute('r','4');c.setAttribute('class','punto-precio');c.setAttribute('title',x.fecha+' · $'+Number(x.precio).toLocaleString('es-AR'));dots.appendChild(c);});}
+</script>{% endif %}
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TecnoRadar - Compará precios</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='tab_title.js') }}" defer></script>
+</head>
+<body>
+<header class="site-header">
+    <div class="header-top">
+        <div class="header-inner header-main">
+            <a class="brand" href="{{ url_for('inicio') }}"><span class="brand-mark">TR</span><span>TECNORADAR</span></a>
+            <form class="searchbar" method="get" action="{{ url_for('inicio') }}">
+                <input type="text" name="q" value="{{ busqueda }}" placeholder="Buscá productos, marcas o modelos..." autocomplete="off">
+                <button type="submit">Buscar</button>
+            </form>
+            <details class="category-menu">
+                <summary><span class="menu-icon">☰</span><span class="desktop-only">Categorías</span><span class="mobile-only">Menú</span></summary>
+                <div class="category-panel">
+                    <a href="{{ url_for('inicio') }}" class="category-item category-all"><span>Ver todo</span><small>{{ '{:,.0f}'.format(total_productos).replace(',', '.') }}</small></a>
+                    {% for categoria in categorias %}
+                        <a href="{{ url_for('inicio', categoria=categoria.nombre) }}" class="category-item">
+                            <span>{{ categoria.nombre }}</span><small>{{ '{:,.0f}'.format(categoria.productos).replace(',', '.') }}</small>
+                        </a>
+                    {% endfor %}
+                </div>
+            </details>
+        </div>
+    </div>
+    <div class="header-nav">
+        <div class="header-inner nav-inner">
+            <nav>
+                <a href="{{ url_for('inicio') }}">Inicio</a>
+                <a href="#categorias">Categorías</a>
+                <a href="#ofertas">Bajaron de precio</a>
+                <a href="#tiendas">Tiendas</a>
+            </nav>
+            <span class="nav-meta">{{ '{:,.0f}'.format(total_productos).replace(',', '.') }} productos · {{ total_tiendas }} tiendas</span>
+        </div>
+    </div>
+</header>
+
+{% if busqueda or tienda_filtro or categoria_filtro %}
+<main class="page-shell">
+    <div class="breadcrumb"><a href="{{ url_for('inicio') }}">Inicio</a><span>›</span><strong>{% if categoria_filtro %}{{ categoria_filtro }}{% elif tienda_filtro %}{{ nombre_tienda_visible(tienda_filtro) }}{% else %}Búsqueda{% endif %}</strong></div>
+    <section class="results-head">
+        <div>
+            <div class="eyebrow">TECNORADAR</div>
+            <h1>{% if busqueda %}Resultados para “{{ busqueda }}”{% elif categoria_filtro %}{{ categoria_filtro }}{% else %}{{ nombre_tienda_visible(tienda_filtro) }}{% endif %}</h1>
+            <p class="muted">Actualizado {{ ultima_actualizacion }}</p>
+        </div>
+        <strong class="result-count">{{ productos|length }} resultados</strong>
+    </section>
+
+    <form class="filterbar" method="get">
+        <input type="hidden" name="q" value="{{ busqueda }}">
+        <input type="hidden" name="categoria" value="{{ categoria_filtro }}">
+        <label><span>Tienda</span><select name="tienda"><option value="">Todas</option>{% for tienda in tiendas %}<option value="{{ tienda }}" {% if tienda_filtro == tienda %}selected{% endif %}>{{ nombre_tienda_visible(tienda) }}</option>{% endfor %}</select></label>
+        <label><span>Precio mínimo</span><input type="number" name="precio_min" value="{{ precio_min }}" placeholder="Desde"></label>
+        <label><span>Precio máximo</span><input type="number" name="precio_max" value="{{ precio_max }}" placeholder="Hasta"></label>
+        <label><span>Ordenar</span><select name="orden"><option value="menor" {% if orden == 'menor' %}selected{% endif %}>Precio más bajo</option><option value="mayor" {% if orden == 'mayor' %}selected{% endif %}>Precio más alto</option></select></label>
+        <label class="check"><input type="checkbox" name="solo_stock" value="1" {% if solo_stock %}checked{% endif %}><span>Solo stock</span></label>
+        <button class="primary-btn" type="submit">Aplicar</button>
+        <a class="clear-btn" href="{{ url_for('inicio') }}">Limpiar</a>
+    </form>
+
+    {% if productos %}
+    <section class="product-section search-results">
+        <div class="section-head"><div><div class="eyebrow">CATÁLOGO</div><h2>Productos</h2></div></div>
+        <div class="product-grid">
+        {% for producto in productos %}
+            {% include 'partials/product_card.html' %}
+        {% endfor %}
+        </div>
+    </section>
+    {% else %}
+        <div class="empty-state"><h2>No encontramos productos</h2><p>Probá con otra búsqueda o modificá los filtros.</p></div>
+    {% endif %}
+</main>
+{% else %}
+<main class="home-shell">
+    <section class="home-hero">
+        <div class="hero-copy">
+            <div class="eyebrow hero-eyebrow">COMPARADOR DE TECNOLOGÍA EN ARGENTINA</div>
+            <h1>Encontrá el mejor precio. <span>Antes de comprar.</span></h1>
+            <p>TecnoRadar reúne precios de distintas tiendas y te ayuda a detectar oportunidades, comparar ofertas y seguir la evolución de cada producto.</p>
+            <form class="hero-search" method="get" action="{{ url_for('inicio') }}">
+                <input name="q" placeholder="Ej.: RTX 4070, Ryzen 7, monitor 27..." autocomplete="off">
+                <button type="submit">Buscar</button>
+            </form>
+            <div class="hero-pills">
+                <a href="#ofertas">🔥 Bajaron de precio</a>
+                <a href="#categorias">Explorar categorías</a>
+                <a href="#tiendas">Ver tiendas</a>
+            </div>
+        </div>
+        <div class="hero-feature">
+            {% if destacado_principal %}
+            <div class="hero-feature-kicker">DESTACADO</div>
+            <a class="hero-feature-image" href="{{ url_for('producto_detalle', codigo=clave_producto(destacado_principal)) }}">
+                {% if destacado_principal.imagen and imagen_utilizable(destacado_principal.imagen) %}
+                    <img src="{{ destacado_principal.imagen }}" alt="{{ destacado_principal.nombre }}" referrerpolicy="no-referrer">
+                {% elif destacado_principal.url %}
+                    <img src="{{ url_for('resolver_imagen', imagen=destacado_principal.imagen or '', producto=destacado_principal.url) }}" alt="{{ destacado_principal.nombre }}" referrerpolicy="no-referrer">
+                {% endif %}
+            </a>
+            <div class="hero-feature-store">{{ nombre_tienda_visible(destacado_principal.tienda) }}</div>
+            <a class="hero-feature-name" href="{{ url_for('producto_detalle', codigo=clave_producto(destacado_principal)) }}">{{ destacado_principal.nombre }}</a>
+            <div class="hero-feature-price">${{ "{:,.0f}".format(destacado_principal.precio).replace(',', '.') }}</div>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="quick-categories" id="categorias">
+        <div class="quick-title"><span>Categorías populares</span><small>Entrá directo a lo que buscás</small></div>
+        {% for categoria in categorias_populares[:6] %}
+        <a class="quick-category" href="{{ url_for('inicio', categoria=categoria.nombre) }}">
+            <span class="quick-icon">{{ categoria.nombre[:2]|upper }}</span>
+            <strong>{{ categoria.nombre }}</strong>
+            <small>{{ '{:,.0f}'.format(categoria.productos).replace(',', '.') }} productos</small>
+        </a>
+        {% endfor %}
+    </section>
+
+    <section class="home-section store-strip-section" id="tiendas">
+        <div class="section-head compact-head"><div><div class="eyebrow">TIENDAS</div><h2>Tiendas participantes</h2></div><a href="#tiendas-todas">Ver todas →</a></div>
+        <div class="store-logo-strip">
+            {% for tienda in tiendas_principales[:8] %}
+            <a class="store-logo-card" href="{{ url_for('inicio', tienda=tienda.clave) }}">
+                <span class="store-logo-wrap"><img class="store-logo" src="{{ logo_tienda_url(tienda.clave) }}" alt="{{ tienda.nombre }}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span class="store-badge store-fallback" style="display:none">{{ tienda.nombre[:1]|upper }}</span></span>
+                <span>{{ tienda.nombre }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% if tiendas_restantes %}
+        <details class="stores-more" id="tiendas-todas">
+            <summary>Mostrar más <span>· {{ tiendas_restantes|length }} tiendas</span></summary>
+            <div class="store-grid store-grid-more">
+                {% for tienda in tiendas_restantes %}
+                <a class="store-card" href="{{ url_for('inicio', tienda=tienda.clave) }}">
+                    <span class="store-logo-wrap"><img class="store-logo" src="{{ logo_tienda_url(tienda.clave) }}" alt="Logo {{ tienda.nombre }}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><span class="store-badge store-fallback" style="display:none">{{ tienda.nombre[:1]|upper }}</span></span>
+                    <div><strong>{{ tienda.nombre }}</strong><small>{{ '{:,.0f}'.format(tienda.productos).replace(',', '.') }} productos</small></div><span class="store-arrow">→</span>
+                </a>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+    </section>
+
+    <section class="home-section" id="ofertas">
+        <div class="section-head"><div><div class="eyebrow">OPORTUNIDADES</div><h2>Bajaron de precio</h2><p>Los productos que registraron una baja reciente.</p></div><a href="{{ url_for('inicio', orden='menor') }}">Ver todos →</a></div>
+        {% if ofertas %}
+        <div class="product-grid product-grid-3">
+            {% for producto in ofertas[:6] %}
+                {% include 'partials/product_card.html' %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-inline">Todavía no hay suficientes bajas históricas registradas.</div>
+        {% endif %}
+    </section>
+
+    <section class="home-section">
+        <div class="section-head"><div><div class="eyebrow">SELECCIÓN TECNORADAR</div><h2>Productos destacados</h2><p>Una selección del catálogo actual, priorizando variedad de tiendas y datos completos.</p></div><a href="{{ url_for('inicio', orden='menor') }}">Explorar catálogo →</a></div>
+        <div class="product-grid product-grid-4">
+            {% for producto in destacados[:8] %}
+                {% include 'partials/product_card.html' %}
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="trust-band">
+        <div><strong>{{ '{:,.0f}'.format(total_productos).replace(',', '.') }}</strong><span>productos</span></div>
+        <div><strong>{{ total_tiendas }}</strong><span>tiendas</span></div>
+        <div><strong>Historial</strong><span>de precios por producto</span></div>
+        <div><strong>Verificación</strong><span>periódica de precios</span></div>
+    </section>
+</main>
+{% endif %}
+
+<footer class="site-footer">
+    <div class="footer-inner">
+        <div class="footer-brand"><a class="brand footer-brand-link" href="{{ url_for('inicio') }}"><span class="brand-mark">TR</span><span>TECNORADAR</span></a><p>Compará precios de tecnología antes de comprar.</p></div>
+        <div><strong>Explorar</strong><a href="#categorias">Categorías</a><a href="#ofertas">Bajaron de precio</a><a href="#tiendas">Tiendas</a></div>
+        <div><strong>Datos</strong><span>{{ '{:,.0f}'.format(total_productos).replace(',', '.') }} productos</span><span>{{ total_tiendas }} tiendas</span><span>Actualizado {{ ultima_actualizacion }}</span></div>
+    </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,6 @@
+V3
+- arregla _precio_card no definido
+- descubrimiento dinámico desde portada
+- extracción parcial: fusiona catálogo anterior en lugar de descartarlo
+- mantiene circuit breakers y aislamiento
+- valida precio/duplicados antes de fusionar
