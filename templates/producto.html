@@ -10,7 +10,7 @@
 <body>
 <header class="site-header">
     <div class="header-top"><div class="header-inner header-main">
-        <a class="brand" href="{{ url_for('inicio') }}"><span class="brand-mark">TR</span><span>TECNORADAR</span></a>
+        <a class="brand" href="{{ url_for('inicio') }}"><img class="brand-logo" src="{{ url_for('static', filename='tecnoradar-logo.svg') }}" alt="TecnoRadar"><span>TECNORADAR</span></a>
         <form class="searchbar" method="get" action="{{ url_for('inicio') }}"><input type="text" name="q" placeholder="Buscá productos, marcas o modelos..." autocomplete="off"><button type="submit">Buscar</button></form>
         <details class="category-menu"><summary><span class="menu-icon">☰</span><span class="desktop-only">Categorías</span><span class="mobile-only">Menú</span></summary><div class="category-panel"><a href="{{ url_for('inicio') }}" class="category-item category-all"><span>Ver todo</span></a>{% for categoria in categorias %}<a href="{{ url_for('inicio', categoria=categoria.nombre) }}" class="category-item"><span>{{ categoria.nombre }}</span><small>{{ '{:,.0f}'.format(categoria.productos).replace(',', '.') }}</small></a>{% endfor %}</div></details>
     </div></div>
@@ -44,7 +44,7 @@
         {% else %}<div class="empty-state"><h2>Sin historial todavía</h2><p>La primera verificación queda registrada al abrir este producto o al ejecutar el verificador automático.</p></div>{% endif %}
     </section>
 </main>
-<footer class="site-footer"><div class="footer-inner"><div class="footer-brand"><a class="brand footer-brand-link" href="{{ url_for('inicio') }}"><span class="brand-mark">TR</span><span>TECNORADAR</span></a><p>Compará precios de tecnología antes de comprar.</p></div><div>Fuente oficial · historial de precios · comparación</div></div></footer>
+<footer class="site-footer"><div class="footer-inner"><div class="footer-brand"><a class="brand footer-brand-link" href="{{ url_for('inicio') }}"><img class="brand-logo" src="{{ url_for('static', filename='tecnoradar-logo.svg') }}" alt="TecnoRadar"><span>TECNORADAR</span></a><p>Compará precios de tecnología antes de comprar.</p></div><div>Fuente oficial · historial de precios · comparación</div></div></footer>
 {% if historial %}<script>
 const serie={{ historial|tojson }};const path=document.getElementById('lineaPrecio');const dots=document.getElementById('puntosPrecio');if(serie.length){const W=900,H=320,p=34,v=serie.map(x=>+x.precio),mn=Math.min(...v),mx=Math.max(...v),r=(mx-mn)||1,X=i=>p+i*((W-2*p)/Math.max(1,serie.length-1)),Y=n=>H-p-((n-mn)/r)*(H-2*p);path.setAttribute('d',serie.map((x,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(+x.precio).toFixed(1)).join(' '));serie.forEach((x,i)=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',X(i));c.setAttribute('cy',Y(+x.precio));c.setAttribute('r','4');c.setAttribute('class','punto-precio');c.setAttribute('title',x.fecha+' · $'+Number(x.precio).toLocaleString('es-AR'));dots.appendChild(c);});}
 </script>{% endif %}
