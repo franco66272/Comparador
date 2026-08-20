@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TecnoRadar - Producto</title>
+<link rel="stylesheet" href="static/style.css">
+<link rel="stylesheet" href="static/brand_fix.css">
+<link rel="stylesheet" href="static/price_chart.css">
+<script src="static/producto_static.js" defer></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="header-top"><div class="header-inner header-main">
+    <a class="brand" href="index.html"><img class="brand-logo" src="static/tecnoradar-logo.svg" alt="TecnoRadar"><span>TECNORADAR</span></a>
+    <form class="searchbar" method="get" action="index.html"><input type="text" name="q" placeholder="Buscá productos, marcas o modelos..." autocomplete="off"><button type="submit">Buscar</button></form>
+    <details class="category-menu"><summary><span class="menu-icon">☰</span><span class="desktop-only">Categorías</span><span class="mobile-only">Menú</span></summary><div class="category-panel" id="categoryPanel"><a href="index.html" class="category-item category-all"><span>Ver todo</span></a></div></details>
+  </div></div>
+  <div class="header-nav"><div class="header-inner nav-inner"><nav><a href="index.html">Inicio</a><a href="index.html">Categorías</a><a id="storeNav" href="index.html">Tienda</a></nav><span class="nav-meta">Catálogo actualizado automáticamente</span></div></div>
+</header>
+<main class="product-page">
+  <div class="breadcrumb"><a href="index.html">Inicio</a><span>›</span><a id="storeCrumb" href="index.html">Tienda</a><span>›</span><strong>Producto</strong></div>
+  <section class="product-spotlight">
+    <div class="detail-media" id="detailMedia"><div class="sin-imagen">Cargando…</div></div>
+    <div class="detail-summary">
+      <div class="detail-store-row"><span class="detail-store" id="storeName">TecnoRadar</span><span class="verified-pill">✓ Catálogo TecnoRadar</span></div>
+      <h1 id="productName">Cargando producto…</h1>
+      <div class="detail-meta"><span class="stock-label" id="stockLabel">Consultando stock</span><span id="verifiedLabel">Última actualización del catálogo</span></div>
+      <div class="price-panel"><span>Precio actual</span><strong id="priceCurrent">—</strong><em id="discount" hidden></em></div>
+      <div class="price-warning" id="updateNotice" hidden></div>
+      <div class="detail-actions"><a class="official-btn" id="officialLink" href="#" target="_blank" rel="noopener noreferrer">Comprar en la tienda ↗</a><a class="secondary-btn" id="verifyLink" href="#">Verificar ahora</a><a class="secondary-btn" id="storeLink" href="#">Ver más de esta tienda</a></div>
+    </div>
+  </section>
+  <section class="detail-section"><div class="detail-section-head"><div><div class="eyebrow">DEL VENDEDOR</div><h2>Descripción</h2></div><span>Información almacenada por TecnoRadar</span></div><div class="description-box" id="description">La descripción se mostrará cuando esté disponible.</div></section>
+  <section class="detail-section"><div class="detail-section-head"><div><div class="eyebrow">SEGUIMIENTO</div><h2>Historial de precios</h2></div><span id="historyCount">0 registros</span></div>
+    <div id="historyEmpty" class="empty-state"><h2>Sin historial todavía</h2><p>La evolución comenzará a registrarse con las actualizaciones automáticas de precios.</p></div>
+    <div id="historyContent" hidden>
+      <div class="price-chart-wrap"><div class="price-chart-head"><div><div class="price-chart-title">Evolución del precio</div><span class="price-chart-subtitle">Historial registrado por TecnoRadar</span></div><span class="price-chart-current" id="chartCurrent">—</span></div>
+        <div class="price-chart-stage" id="priceChartStage"><svg id="graficoPrecio" class="price-chart" viewBox="0 0 900 330" preserveAspectRatio="none" role="img" aria-label="Evolución del precio del producto"><defs><linearGradient id="priceAreaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d45757" stop-opacity=".30"></stop><stop offset="100%" stop-color="#d45757" stop-opacity="0"></stop></linearGradient></defs><g id="chartGrid"></g><path id="priceArea" class="price-chart-area" d=""></path><path id="lineaPrecio" class="price-chart-line" d=""></path><g id="chartAxes"></g><g id="puntosPrecio"></g></svg><div id="priceTooltip" class="price-chart-tooltip" hidden><span class="price-chart-tooltip-date"></span><span class="price-chart-tooltip-price"></span></div></div>
+        <div class="price-chart-note">Pasá el cursor por los puntos para consultar el valor registrado.</div>
+      </div>
+      <div class="history-card" id="historyRows"></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer"><div class="footer-inner"><div class="footer-brand"><a class="brand footer-brand-link" href="index.html"><img class="brand-logo" src="static/tecnoradar-logo.svg" alt="TecnoRadar"><span>TECNORADAR</span></a><p>Compará precios de tecnología antes de comprar.</p></div><div>Fuente oficial · historial de precios · comparación</div></div></footer>
+</body>
+</html>
