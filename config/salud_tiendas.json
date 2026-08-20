@@ -1,184 +1,521 @@
 {
-  "37bytes_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 0,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+  "compragamer": {
+    "salud": "HEALTHY",
+    "completitud": "alta",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 1378,
+    "productos_nuevos": 13,
+    "productos_actualizados": 199,
+    "productos_eliminados": 13,
+    "fuente": "extraccion_nueva",
+    "warnings": [
+      "2 productos inválidos descartados"
+    ]
+  },
+  "mexx": {
+    "salud": "HEALTHY",
+    "completitud": "alta",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 69,
+    "productos_nuevos": 2,
+    "productos_actualizados": 20,
+    "productos_eliminados": 5,
+    "fuente": "extraccion_nueva",
+    "warnings": [
+      "13 duplicados eliminados"
+    ]
+  },
+  "venex": {
+    "salud": "HEALTHY",
+    "completitud": "alta",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 46,
+    "productos_nuevos": 17,
+    "productos_actualizados": 2,
+    "productos_eliminados": 17,
+    "fuente": "extraccion_nueva",
+    "warnings": []
+  },
+  "puertominero": {
+    "salud": "HEALTHY",
+    "completitud": "alta",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 63,
+    "productos_nuevos": 1,
+    "productos_actualizados": 1,
+    "productos_eliminados": 4,
+    "fuente": "extraccion_nueva",
+    "warnings": []
+  },
+  "Quantum Hardstore": {
+    "salud": "HEALTHY",
+    "completitud": "alta",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 2111,
+    "productos_nuevos": 2,
+    "productos_actualizados": 4,
+    "productos_eliminados": 2,
+    "fuente": "extraccion_nueva",
+    "warnings": []
+  },
+  "Logg": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 100,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 100,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Página 1 sin productos — revisar selector 'a.product-card'",
+      "Extracción no utilizable; se conserva el catálogo anterior (100)"
+    ]
+  },
+  "Maximus": {
+    "salud": "HEALTHY",
+    "completitud": "alta",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 1129,
+    "productos_nuevos": 71,
+    "productos_actualizados": 29,
+    "productos_eliminados": 45,
+    "fuente": "extraccion_nueva",
+    "warnings": []
   },
   "710tech_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 538,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
-  },
-  "armytech_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 299,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
-  },
-  "backupcomputacion_com": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 59,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
-  },
-  "compufanstore_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 384,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 538,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/710tech_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (538)"
+    ]
   },
   "fullh4rd_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 1411,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 1411,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/fullh4rd_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (1411)"
+    ]
   },
-  "gamerfactory_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+  "37bytes_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 0,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 0,
+    "fuente": "sin_catalogo",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/37bytes_com_ar.log",
+      "No existe catálogo anterior para usar como fallback"
+    ]
+  },
+  "compufanstore_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 384,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 384,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/compufanstore_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (384)"
+    ]
+  },
+  "backupcomputacion_com": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 59,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 59,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/backupcomputacion_com.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (59)"
+    ]
   },
   "gamingcity_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 1784,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 1784,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/gamingcity_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (1784)"
+    ]
+  },
+  "gamerfactory_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 0,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 0,
+    "fuente": "sin_catalogo",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/gamerfactory_com_ar.log",
+      "No existe catálogo anterior para usar como fallback"
+    ]
   },
   "gezatek_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 1023,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 1023,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/gezatek_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (1023)"
+    ]
   },
-  "hardcorecomputacion_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 767,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+  "GoldenTech Store": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 0,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 0,
+    "fuente": "sin_catalogo",
+    "warnings": [
+      "Página 1 sin tarjetas de productos",
+      "Log detallado: logs_auto/goldentechstore_com_ar.log",
+      "No existe catálogo anterior para usar como fallback"
+    ]
   },
   "hypergaming_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 676,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 676,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/hypergaming_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (676)"
+    ]
+  },
+  "armytech_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 299,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 299,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/armytech_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (299)"
+    ]
   },
   "insumosacuario_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 1439,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 1439,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/insumosacuario_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (1439)"
+    ]
   },
   "integradosargentinos_com": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 757,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
-  },
-  "katech_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 2460,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
-  },
-  "liontech_gaming_com": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 629,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 757,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/integradosargentinos_com.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (757)"
+    ]
   },
   "megasoftargentina_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 73,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 73,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/megasoftargentina_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (73)"
+    ]
+  },
+  "katech_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 2460,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 2460,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/katech_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (2460)"
+    ]
   },
   "mymcomputacion_com": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 1013,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 1013,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/mymcomputacion_com.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (1013)"
+    ]
+  },
+  "netgaming_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 325,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 325,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/netgaming_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (325)"
+    ]
   },
   "ngtechnologies_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 161,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 161,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/ngtechnologies_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (161)"
+    ]
+  },
+  "liontech_gaming_com": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 629,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 629,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/liontech_gaming_com.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (629)"
+    ]
   },
   "noxiestore_com": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 495,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 495,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/noxiestore_com.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (495)"
+    ]
   },
-  "portalstore_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 11,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+  "hardcorecomputacion_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 767,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 767,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/hardcorecomputacion_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (767)"
+    ]
+  },
+  "necxus_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 2,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 2,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/necxus_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (2)"
+    ]
   },
   "rockethard_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 690,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 690,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/rockethard_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (690)"
+    ]
   },
-  "shopgamer_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 1797,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
-  },
-  "slot_one_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 4,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
-  },
-  "spacegamer_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 34,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
-  },
-  "vrx_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
-    "productos": 0,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+  "portalstore_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 11,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 11,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/portalstore_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (11)"
+    ]
   },
   "xt_pc_com_ar": {
-    "salud": "UNKNOWN",
-    "completitud": "desconocida",
-    "ultima_ejecucion": null,
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
     "productos": 912,
-    "nota": "Snapshot inicial; se reemplaza por el estado real al ejecutar actualizar.py."
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 912,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: Invalid IPv6 URL",
+      "Log detallado: logs_auto/xt_pc_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (912)"
+    ]
+  },
+  "shopgamer_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 1797,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 1797,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/shopgamer_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (1797)"
+    ]
+  },
+  "slot_one_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 4,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 4,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/slot_one_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (4)"
+    ]
+  },
+  "vrx_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 0,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 0,
+    "fuente": "sin_catalogo",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/vrx_com_ar.log",
+      "No existe catálogo anterior para usar como fallback"
+    ]
+  },
+  "spacegamer_com_ar": {
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-08-20T02:15:43",
+    "productos": 34,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 34,
+    "fuente": "catalogo_anterior",
+    "warnings": [
+      "Excepción del extractor: name 'candidates' is not defined",
+      "Log detallado: logs_auto/spacegamer_com_ar.log",
+      "Extracción no utilizable; se conserva el catálogo anterior (34)"
+    ]
   }
 }
