@@ -15,7 +15,10 @@ OUT.mkdir(parents=True)
 # Render the same Flask home page using the repository's current local data.
 with app.test_client() as client:
     response = client.get("/")
-    response.raise_for_status = lambda: None
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"No se pudo generar la portada estática: HTTP {response.status_code}"
+        )
     html = response.get_data(as_text=True)
 
 # GitHub Pages hosts the visual shell. Anything requiring Flask is sent to Render.
@@ -28,11 +31,18 @@ html = html.replace('href="/salud"', f'href="{RENDER_BASE}/salud"')
 html = html.replace('href="/health"', f'href="{RENDER_BASE}/health"')
 
 # Keep the GitHub Pages test clearly identifiable without changing the site's design.
-html = html.replace('</head>', '<meta name="generator" content="TecnoRadar GitHub Pages performance test"></head>', 1)
+html = html.replace(
+    '</head>',
+    '<meta name="generator" content="TecnoRadar GitHub Pages performance test"></head>',
+    1,
+)
 (OUT / "index.html").write_text(html, encoding="utf-8")
 
 # Copy the existing frontend assets exactly as they are used by Render.
-shutil.copytree(ROOT / "static", OUT / "static")
+static_dir = ROOT / "static"
+if not static_dir.is_dir():
+    raise RuntimeError(f"No existe el directorio de frontend: {static_dir}")
+shutil.copytree(static_dir, OUT / "static")
 
 # Prevent GitHub Pages from treating files beginning with underscores specially.
 (OUT / ".nojekyll").write_text("", encoding="utf-8")
