@@ -4,6 +4,13 @@ on:
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'config/tiendas_auto.json'
+      - 'actualizar.py'
+      - 'extractores/**'
+      - '.github/workflows/actualizar-precios.yml'
 
 permissions:
   contents: write
@@ -11,7 +18,7 @@ permissions:
 jobs:
   actualizar:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - name: Descargar proyecto
         uses: actions/checkout@v4
@@ -25,14 +32,14 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Verificar lote de precios
-        run: python verificar_precios.py --lote 200 --workers 8 --horas 12
+      - name: Actualizar catálogo completo
+        run: python actualizar.py
 
       - name: Guardar datos actualizados
         run: |
           git config user.name "TecnoRadar Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add productos.json historial_precios.json detalles_productos.json
+          git add '*.json'
           git diff --cached --quiet && exit 0
-          git commit -m "Actualizar precios automáticamente"
+          git commit -m "Actualizar catálogo completo"
           git push
