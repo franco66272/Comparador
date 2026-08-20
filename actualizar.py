@@ -17,7 +17,9 @@ from validacion.validar import validar_resultado
 
 RAIZ = Path(__file__).parent
 SPIDERS_SCRAPY = ["compragamer", "mexx", "venex", "puertominero"]
-AUTO_TIMEOUT = 330
+# Los extractores automáticos hacen navegación web y algunos sitios son lentos.
+# 7 minutos evita que un sitio puntual bloquee innecesariamente toda la tanda.
+AUTO_TIMEOUT = 420
 AUTO_LOG_DIR = RAIZ / "logs_auto"
 
 
@@ -127,7 +129,9 @@ def main():
             if extractor:
                 pendientes.append((nombre, extractor))
 
-        workers = min(5, max(1, len(pendientes)))
+        # Más concurrencia reduce drásticamente la duración total del catálogo.
+        # Cada extractor está aislado en su propio proceso para no compartir estado.
+        workers = min(8, max(1, len(pendientes)))
         futuros = {}
         with ThreadPoolExecutor(max_workers=workers) as pool:
             for nombre, extractor in pendientes:
