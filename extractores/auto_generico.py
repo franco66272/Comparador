@@ -1,20 +1,27 @@
-"""
-Motor universal de adquisición de catálogos.
+"""Motor universal de catálogos de TecnoRadar.
 
-La prioridad es descubrir fuentes de productos, no recorrer URLs indiscriminadamente.
-El motor:
-- prueba fuentes estructuradas primero;
-- puntúa categorías y productos antes de recorrerlos;
-- limita candidatos, requests, páginas y productos;
-- combina varias fuentes cuando aportan cobertura;
-- detecta contenido irrelevante;
-- devuelve métricas y nivel de completitud para el validador.
+Principio central: primero se descubre el catálogo completo y después se
+extraen los productos. Nunca se usa una lista de palabras para decidir qué
+URLs existen, porque eso provocaba catálogos de 0/10/20 productos cuando la
+tienda tenía cientos o miles.
+
+Fuentes soportadas:
+- WooCommerce Store API pública
+- Shopify products.json
+- Magento REST público
+- sitemap.xml / sitemap_index.xml / product-sitemap.xml
+- categorías y paginación HTML
+- JSON-LD Product y tarjetas HTML
+
+El resultado incluye métricas de cobertura para que el validador pueda
+rechazar una extracción parcial.
 """
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from html import unescape
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
 
 import requests
 from bs4 import BeautifulSoup
@@ -23,66 +30,53 @@ from .utils import parse_precio_ar, session_con_reintentos
 
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/151.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/151.0 Safari/537.36"
     ),
     "Accept-Language": "es-AR,es;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
 }
 
-MAX_SEGUNDOS = 150
-MAX_REQUESTS = 120
-MAX_CANDIDATAS = 80
-MAX_FUENTES = 8
-MAX_PAGINAS = 80
-MAX_PRODUCTOS = 10000
-HTTP_TIMEOUT = 9
-MAX_SIN_RESULTADOS = 3
-MAX_LINKS_FALLBACK = 20
-PROBE_LIMIT = 18
+# Una tienda grande puede tener miles de fichas. El límite anterior de 120
+# requests era la principal causa de catálogos incompletos.
+MAX_SEGUNDOS = 280
+MAX_REQUESTS = 5000
+MAX_PAGINAS = 1000
+MAX_PRODUCTOS = 20000
+MAX_SITEMAP_URLS = 30000
+DETAIL_WORKERS = 12
+HTTP_TIMEOUT = 10
 
-PRODUCTO_INCLUIR = (
-    "pc", "computadora", "computacion", "hardware", "componente", "componentes",
-    "mother", "motherboard", "placa madre",
-    "procesador", "processor", "cpu", "cpus", "ryzen", "threadripper",
-    "core i3", "core i5", "core i7", "core i9",
-    "gpu", "gpus", "vga", "placa de video", "placa-de-video",
-    "geforce", "radeon", "rtx", "gtx", "rx ",
-    "memoria", "ram", "ddr", "ssd", "nvme", "hdd", "disco", "almacenamiento",
-    "fuente", "psu", "gabinete", "case", "cooler", "watercooler",
-    "water-cooling", "water-cooler", "refrigeracion",
-    "monitor", "teclado", "keyboard", "mouse", "auricular", "auriculares",
-    "headset", "webcam", "joystick", "gamepad", "notebook", "laptop",
-    "router", "switch", "wifi", "wi-fi", "ethernet", "red", "periferico",
-    "perifericos", "microfono", "micrófono", "ups", "capturadora",
+PRODUCT_PATH_RE = re.compile(
+    r"/(?:producto|product|productos|products|p)/[^/?#]+",
+    re.I,
+)
+PAGE_RE = re.compile(
+    r"(?:^|[?&/])(?:page|p|pagina|pagenum|pageNumber|page_num)[=/]\d+",
+    re.I,
 )
 
-EXCLUIR = (
-    "cocina", "living", "comedor", "mueble", "muebles", "placard",
-    "cama", "colchon", "colchón", "despensero", "tocador", "biblioteca",
-    "pileta", "piscina", "jardin", "jardín", "hogar", "bazar", "limpieza",
-    "electrodomestico", "electrodoméstico", "freidora", "pava electrica",
-    "pava-electrica", "lavarropas", "heladera", "vestidor", "sofa", "sofá",
-    "sillon", "sillón", "ropa", "calzado", "juguete", "juguetes", "mascota",
-    "alimento", "mattress", "colchones", "muebles-de-jardin",
-)
-
-SOURCE_EXCLUDE = EXCLUIR + (
+SOURCE_EXCLUDE = (
     "contacto", "nosotros", "quienes-somos", "privacidad", "terminos",
     "politicas", "login", "register", "carrito", "checkout", "wishlist",
-    "blog", "faq", "preguntas-frecuentes", "sobre-nosotros",
+    "blog", "faq", "preguntas-frecuentes", "sobre-nosotros", "mi-cuenta",
+    "account", "wp-json", "/feed", "tag/", "autor/", "author/",
 )
 
-CATEGORY_MARKERS = (
-    "/categoria", "/categorias", "/category", "/categories", "/collection",
-    "/collections", "/tienda/", "/shop/", "/hardware", "/componentes",
-    "/computacion", "/perifericos", "/placas", "/procesadores", "/memorias",
-    "/almacenamiento", "/storage", "/monitores", "/gabinetes", "/refrigeracion",
-    "/notebooks", "/notebook", "/accesorios", "/productos/", "/products/",
+PRODUCT_MARKERS = (
+    "producto", "productos", "product", "products", "item", "sku",
+    "hardware", "componentes", "computacion", "perifericos", "notebook",
+    "laptop", "monitor", "placa", "procesador", "memoria", "ram", "ssd",
+    "disco", "fuente", "gabinete", "cooler", "teclado", "mouse", "auricular",
+    "headset", "webcam", "microfono", "router", "wifi", "cable", "adaptador",
+    "consola", "playstation", "xbox", "nintendo", "joystick", "silla", "gaming",
+    "toner", "impresora", "tablet", "celular", "smartwatch", "audio",
 )
 
-PRODUCT_PATH_RE = re.compile(r"/(?:producto|product|productos|products)/[^/]+", re.I)
-PAGE_RE = re.compile(r"(?:^|[?&])(?:page|p|pagina|pageNumber|page_num)=\d+", re.I)
+IMAGE_PLACEHOLDERS = (
+    "placeholder", "no-image", "no_image", "default-image", "copito.png",
+    "data:image", "spacer.gif", "transparent.gif",
+)
 
 
 class Presupuesto:
@@ -90,7 +84,6 @@ class Presupuesto:
         self.inicio = time.monotonic()
         self.requests = 0
         self.paginas = 0
-        self.fuentes = 0
         self.productos = 0
 
     def vencido(self):
@@ -114,15 +107,11 @@ def _normalizar_url(url):
     try:
         p = urlparse(str(url).strip())
         return urlunparse((
-            p.scheme.lower(),
-            p.netloc.lower(),
-            p.path.rstrip("/") or "/",
-            "",
-            p.query,
-            "",
+            p.scheme.lower(), p.netloc.lower(), p.path.rstrip("/") or "/",
+            "", p.query, "",
         ))
     except Exception:
-        return str(url)
+        return str(url).strip()
 
 
 def _url(base, valor):
@@ -134,43 +123,20 @@ def _url(base, valor):
     return urljoin(base, valor)
 
 
-def _coincide(valor, termino):
-    valor = str(valor or "").lower()
-    termino = termino.lower()
-    if len(termino) <= 3:
-        return bool(re.search(r"(?<![a-z0-9])" + re.escape(termino) + r"(?![a-z0-9])", valor))
-    return termino in valor
-
-
-def _score_relevancia(texto):
-    valor = str(texto or "").lower()
-    negativos = sum(1 for x in EXCLUIR if _coincide(valor, x))
-    positivos = sum(1 for x in PRODUCTO_INCLUIR if _coincide(valor, x))
-    score = positivos * 2 - negativos * 7
-
-    # Modelos y nomenclaturas muy comunes en hardware.
-    if re.search(r"\b(?:rtx|gtx|rx|radeon|geforce)\s*\d{3,4}\b", valor):
-        score += 5
-    if re.search(r"\bryzen\s*[3579]\b|\bcore\s+i[3579]\b", valor):
-        score += 5
-    if re.search(r"\b(?:ddr[345]|nvme|m\.?2|sata|hdmi|displayport)\b", valor):
-        score += 2
-    return score
-
-
-def _texto_relevante(texto, umbral=2):
-    return _score_relevancia(texto) >= umbral
-
-
-def _producto_relevante(producto):
-    nombre = str(producto.get("nombre", ""))
-    url = str(producto.get("url", ""))
-    score_nombre = _score_relevancia(nombre)
-    if score_nombre < 1 and not _texto_relevante(url, 4):
+def _es_misma_tienda(url, base):
+    try:
+        return urlparse(url).netloc.lower().lstrip("www.") == urlparse(base).netloc.lower().lstrip("www.")
+    except Exception:
         return False
-    if any(_coincide(nombre, x) for x in EXCLUIR):
-        return False
-    return True
+
+
+def _es_fuente_excluida(url):
+    valor = str(url or "").lower()
+    return any(x in valor for x in SOURCE_EXCLUDE)
+
+
+def _es_producto_url(url):
+    return bool(PRODUCT_PATH_RE.search(urlparse(url).path))
 
 
 def _precio(valor):
@@ -183,59 +149,45 @@ def _precio(valor):
     return n if n and 100 <= n <= 100_000_000 else None
 
 
-IMAGE_PLACEHOLDERS = (
-    "a12.svg", "a13.svg", "a14.svg", "fuego.png",
-    "placeholder", "no-image", "no_image", "default-image", "copito.png",
-)
-
 def _imagen_valida(url):
     valor = str(url or "").strip().lower()
-    if not valor or valor.startswith("data:"):
-        return False
-    return not any(x in valor for x in IMAGE_PLACEHOLDERS)
+    return bool(valor) and not any(x in valor for x in IMAGE_PLACEHOLDERS)
+
 
 def _imagen(img, base):
     if not img:
         return None
     if isinstance(img, str):
-        valor = _url(base, img)
-        return valor if _imagen_valida(valor) else None
+        candidato = _url(base, img)
+        return candidato if _imagen_valida(candidato) else None
     for atributo in (
-        "data-zoom-image", "data-large-image", "data-full",
-        "data-original", "data-image", "data-lazy-src",
-        "data-src", "src",
+        "data-zoom-image", "data-large-image", "data-full", "data-original",
+        "data-image", "data-lazy-src", "data-src", "src",
     ):
         valor = img.get(atributo)
         if valor:
-            candidata = _url(base, valor)
-            if _imagen_valida(candidata):
-                return candidata
-    if img.get("data-srcset"):
-        for item in str(img["data-srcset"]).split(","):
-            valor = item.strip().split(" ")[0]
-            candidata = _url(base, valor)
-            if _imagen_valida(candidata):
-                return candidata
-    if img.get("srcset"):
-        for item in str(img["srcset"]).split(","):
-            valor = item.strip().split(" ")[0]
-            candidata = _url(base, valor)
-            if _imagen_valida(candidata):
-                return candidata
+            candidato = _url(base, valor)
+            if _imagen_valida(candidato):
+                return candidato
+    for atributo in ("data-srcset", "srcset"):
+        if img.get(atributo):
+            for item in str(img[atributo]).split(","):
+                candidato = _url(base, item.strip().split()[0])
+                if _imagen_valida(candidato):
+                    return candidato
     return None
 
-def _imagen_desde_html(nodo, base):
-    if not nodo:
-        return None
-    # Algunos motores de e-commerce dejan la imagen real en noscript o
-    # atributos HTML mientras src apunta al placeholder.
-    texto = str(nodo)
-    urls = re.findall(r'https?://[^\"\'\s>]+', texto, re.I)
-    for valor in urls:
-        candidata = _url(base, valor)
-        if _imagen_valida(candidata) and re.search(r'\.(?:jpe?g|png|webp|gif)(?:[?#]|$)', candidata, re.I):
-            return candidata
-    return None
+
+def _producto_relevante(producto):
+    """No descarta por nombre.
+
+    El comparador debe conocer el catálogo real de la tienda. La clasificación
+    de categorías se hace después, en la aplicación. Sólo rechazamos registros
+    que claramente no son una ficha de producto.
+    """
+    nombre = str(producto.get("nombre") or "").strip()
+    url = str(producto.get("url") or "")
+    return bool(nombre and producto.get("precio") and url)
 
 
 def _producto_jsonld(data, base_url, tienda):
@@ -243,31 +195,34 @@ def _producto_jsonld(data, base_url, tienda):
         return None
     tipo = data.get("@type")
     tipos = tipo if isinstance(tipo, list) else [tipo]
-    if "Product" not in tipos:
+    if not any(str(x).lower() == "product" for x in tipos):
         return None
 
     nombre = str(data.get("name") or "").strip()
     if not nombre:
         return None
 
-    oferta = data.get("offers")
-    if isinstance(oferta, list):
-        oferta = oferta[0] if oferta else {}
-    if not isinstance(oferta, dict):
-        oferta = {}
+    offers = data.get("offers")
+    if isinstance(offers, list):
+        offers = offers[0] if offers else {}
+    if not isinstance(offers, dict):
+        offers = {}
 
-    precio = _precio(oferta.get("price") or oferta.get("lowPrice") or data.get("price"))
+    precio = _precio(
+        offers.get("price") or offers.get("lowPrice") or
+        data.get("price") or data.get("salePrice")
+    )
     if not precio:
         return None
 
-    disponibilidad = str(oferta.get("availability") or "").lower()
-    stock = 1 if "instock" in disponibilidad else 0
+    disponibilidad = str(offers.get("availability") or "").lower()
+    stock = 0 if any(x in disponibilidad for x in ("outofstock", "soldout", "unavailable")) else 1
     url = _url(base_url, data.get("url")) or base_url
     imagen = data.get("image") or data.get("thumbnailUrl")
     if isinstance(imagen, list):
         imagen = imagen[0] if imagen else None
-
     sku = data.get("sku") or data.get("mpn") or data.get("productID") or url
+
     return {
         "tienda": tienda,
         "nombre": nombre,
@@ -281,117 +236,50 @@ def _producto_jsonld(data, base_url, tienda):
 
 def _extraer_jsonld(html, base_url, tienda):
     soup = BeautifulSoup(html, "html.parser")
-    productos, vistos = [], set()
+    encontrados = []
+    vistos = set()
     for script in soup.select('script[type="application/ld+json"]'):
-        texto = script.string or script.get_text()
         try:
-            data = json.loads(texto)
+            data = json.loads(script.string or script.get_text())
         except Exception:
             continue
-        objetos = []
-        if isinstance(data, list):
-            objetos = data
-        elif isinstance(data, dict):
-            objetos = [data]
-            if isinstance(data.get("@graph"), list):
-                objetos.extend(data["@graph"])
-
-        pila = list(objetos)
+        pila = data if isinstance(data, list) else [data]
         while pila:
             obj = pila.pop()
             if isinstance(obj, dict):
-                producto = _producto_jsonld(obj, base_url, tienda)
-                if producto and _producto_relevante(producto):
-                    clave = producto["id_producto"]
+                p = _producto_jsonld(obj, base_url, tienda)
+                if p and _producto_relevante(p):
+                    clave = p["id_producto"]
                     if clave not in vistos:
                         vistos.add(clave)
-                        productos.append(producto)
+                        encontrados.append(p)
                 for value in obj.values():
                     if isinstance(value, (dict, list)):
                         pila.append(value)
             elif isinstance(obj, list):
                 pila.extend(obj)
-    return productos
+    return encontrados
 
 
-def _precio_card(card, nombre=None):
-    # Primero usar campos explícitos de precio. Nunca inferir el precio desde
-    # el nombre del producto: algunos vendedores incluyen ofertas antiguas,
-    # cuotas o importes promocionales dentro del título.
+def _precio_card(card):
     for nodo in card.select(
-        "[data-price-amount], [data-price], [itemprop=price], "
-        ".price, .precio, .product-price, .price-box, .special-price, .sale-price"
+        "[data-price-amount], [data-price], [itemprop=price], [itemprop=lowPrice], "
+        ".price, .precio, .product-price, .price-box, .special-price, .sale-price, "
+        ".woocommerce-Price-amount, .amount, .current-price"
     ):
         valor = (
-            nodo.get("data-price-amount")
-            or nodo.get("data-price")
-            or nodo.get("content")
-            or nodo.get_text(" ", strip=True)
+            nodo.get("data-price-amount") or nodo.get("data-price") or
+            nodo.get("content") or nodo.get_text(" ", strip=True)
         )
         precio = _precio(valor)
         if precio:
-            return precio, "structured"
-
-    texto = card.get_text(" ", strip=True)
-    if nombre:
-        # Evitar que una cifra escrita dentro del título sea tomada como
-        # precio real. Conservamos el resto del texto del card.
-        texto_sin_nombre = texto.replace(str(nombre), " ")
-    else:
-        texto_sin_nombre = texto
-
-    for patron in (r"\$\s*[\d.]+(?:,\d+)?", r"(?:ARS|ar\$)\s*[\d.]+(?:,\d+)?"):
-        m = re.search(patron, texto_sin_nombre, re.I)
-        if m:
-            precio = _precio(m.group(0))
-            if precio:
-                return precio, "text"
-    return None, None
-
-
-def _precio_detalle(url):
-    try:
-        r = requests.get(
-            url, timeout=8, allow_redirects=True,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0 Safari/537.36", "Accept-Language": "es-AR,es;q=0.9"}
-        )
-        if r.status_code != 200:
-            return None
-    except requests.RequestException:
-        return None
-
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    # 1) JSON-LD: fuente estructurada de mayor prioridad.
-    for producto in _extraer_jsonld(r.text, url, ""):
-        if producto.get("precio"):
-            return int(producto["precio"])
-
-    # 2) Metadatos específicos de producto.
-    for nodo in soup.select('meta[property="product:price:amount"], meta[itemprop="price"]'):
-        precio = _precio(nodo.get("content"))
-        if precio:
             return precio
 
-    # 3) Texto explícitamente asociado al precio principal del producto.
-    texto = soup.get_text(" ", strip=True)
-    patrones_prioritarios = (
-        r"Precio\s+(?:especial|oferta|actual|promocional)\s*[:：]?\s*\$\s*([\d.]+(?:,\d+)?)",
-        r"Precio\s*[:：]?\s*\$\s*([\d.]+(?:,\d+)?)",
-    )
-    for patron in patrones_prioritarios:
+    texto = card.get_text(" ", strip=True)
+    for patron in (r"\$\s*[\d.]+(?:,\d+)?", r"(?:ARS|ar\$)\s*[\d.]+(?:,\d+)?"):
         m = re.search(patron, texto, re.I)
         if m:
-            precio = _precio(m.group(1))
-            if precio:
-                return precio
-
-    # 4) Selectores de precio dentro del bloque principal antes de
-    # considerar listas de productos relacionados.
-    for contenedor in soup.select("main, #content, .product-detail, .product-detail-page, .product, .producto")[:6]:
-        for nodo in contenedor.select("[itemprop=price], .price, .precio, .product-price, .special-price, .current-price, .sale-price")[:15]:
-            valor = nodo.get("content") or nodo.get("data-price") or nodo.get_text(" ", strip=True)
-            precio = _precio(valor)
+            precio = _precio(m.group(0))
             if precio:
                 return precio
     return None
@@ -400,129 +288,64 @@ def _precio_detalle(url):
 def _nombre_card(card):
     for selector in (
         "[data-product-name]", "[data-name]", ".product-item-link",
-        ".product-item-name", ".product-name", ".product-title",
-        ".product-name a", ".name", ".title",
-        "[itemprop=name]", "h1", "h2", "h3", "h4", "h5",
+        ".product-item-name", ".product-name", ".product-title", ".woocommerce-loop-product__title",
+        ".product-name a", ".name", ".title", "[itemprop=name]", "h1", "h2", "h3", "h4", "h5",
     ):
         nodo = card.select_one(selector)
         if not nodo:
             continue
         valor = (
-            nodo.get("data-product-name") or nodo.get("data-name")
-            or nodo.get("title") or nodo.get_text(" ", strip=True)
+            nodo.get("data-product-name") or nodo.get("data-name") or
+            nodo.get("title") or nodo.get_text(" ", strip=True)
         )
-        if valor and len(valor.strip()) >= 4:
+        if valor and len(valor.strip()) >= 3:
             return valor.strip()
     return None
 
 
 def _extraer_card(card, base_url, tienda):
-    nombre = _nombre_card(card)
-    if not nombre:
-        return None
     enlace = card.select_one("a[href]")
     if not enlace:
         return None
-    href = _url(base_url, enlace.get("href"))
-    if not href:
+    href = _normalizar_url(_url(base_url, enlace.get("href")))
+    if not href or not _es_misma_tienda(href, base_url) or not _es_producto_url(href):
         return None
-    precio, fuente_precio = _precio_card(card, nombre)
-    patron_nombre = re.search(r"\$\s*([\d.]+(?:,\d+)?)", str(nombre or ""))
-
-    # Si el card no contiene un precio estructurado y el nombre sí contiene
-    # un importe, verificar la ficha individual. No interpretar nunca ese
-    # importe del título como precio del producto.
-    if not precio:
-        if patron_nombre:
-            verificado = _precio_detalle(href)
-            if not verificado:
-                return None
-            precio = verificado
-            fuente_precio = "detail_page"
-        else:
-            return None
-
-    # Caso especialmente peligroso: el único importe visible en la tarjeta
-    # coincide con un monto escrito dentro del nombre (por ejemplo,
-    # "OFERTA $ 240"). En ese escenario jamás confiar en el título: verificar
-    # la página individual del producto.
-    if patron_nombre and fuente_precio in ("text", "structured"):
-        monto_nombre = _precio(patron_nombre.group(1))
-        if monto_nombre and int(precio) == int(monto_nombre):
-            verificado = _precio_detalle(href)
-            if verificado:
-                precio = verificado
-                fuente_precio = "detail_page"
-            else:
-                return None
-    imagen_nodo = card.select_one("img")
-    imagen = _imagen(imagen_nodo, base_url)
-    if not imagen:
-        imagen = _imagen_desde_html(card, base_url)
-
+    nombre = _nombre_card(card) or enlace.get("title") or enlace.get_text(" ", strip=True)
+    precio = _precio_card(card)
+    if not nombre or not precio:
+        return None
+    imagen = _imagen(card.select_one("img"), base_url)
     product_id = (
-        card.get("data-product-id") or card.get("data-productid")
-        or card.get("data-id") or enlace.get("data-product-id")
-        or href
+        card.get("data-product-id") or card.get("data-productid") or
+        card.get("data-id") or enlace.get("data-product-id") or href
     )
-    producto = {
+    return {
         "tienda": tienda,
-        "nombre": nombre,
+        "nombre": nombre.strip(),
         "precio": precio,
         "stock": 1,
         "imagen": imagen,
         "url": href,
         "id_producto": str(product_id),
     }
-    return producto if _producto_relevante(producto) else None
 
 
 def _detectar_cards(soup):
     selectores = (
-        ".product-item", ".product-card", ".product-card-item",
-        ".item.product", "article.product", "[data-product-id]",
-        "[data-productid]", "[itemtype*='Product']",
+        ".product-item", ".product-card", ".product-card-item", ".item.product",
+        "article.product", ".product", "li.product", ".type-product",
+        "[data-product-id]", "[data-productid]", "[itemtype*='Product']",
     )
     mejor = []
     for selector in selectores:
         try:
-            encontrados = soup.select(selector)
+            cards = soup.select(selector)
         except Exception:
             continue
-        validos = []
-        for card in encontrados:
-            if not card.select_one("a[href]"):
-                continue
-            if not (_precio_card(card) or card.select_one("[itemprop=price]")):
-                continue
-            nombre = _nombre_card(card)
-            if not nombre or not _producto_relevante({"nombre": nombre, "url": ""}):
-                continue
-            validos.append(card)
+        validos = [c for c in cards if c.select_one("a[href]") and _precio_card(c)]
         if len(validos) > len(mejor):
             mejor = validos
-    if mejor:
-        return mejor
-
-    candidatos = []
-    for elemento in soup.find_all(["article", "li", "div"]):
-        if len(elemento.find_all(["article", "li", "div"])) > 45:
-            continue
-        texto = elemento.get_text(" ", strip=True)
-        if len(texto) < 15 or len(texto) > 1500:
-            continue
-        if not _texto_relevante(texto):
-            continue
-        if not elemento.select_one("a[href]") or not _precio_card(elemento):
-            continue
-        candidatos.append(elemento)
-
-    finales = []
-    for candidato in candidatos:
-        if any(otro is not candidato and otro in candidato.descendants for otro in candidatos):
-            continue
-        finales.append(candidato)
-    return finales
+    return mejor
 
 
 def _extraer_html(html, base_url, tienda):
@@ -530,39 +353,91 @@ def _extraer_html(html, base_url, tienda):
     productos = []
     vistos = set()
     for card in _detectar_cards(soup):
-        producto = _extraer_card(card, base_url, tienda)
-        if not producto:
+        p = _extraer_card(card, base_url, tienda)
+        if not p:
             continue
-        clave = producto["id_producto"]
-        if clave in vistos:
-            continue
-        vistos.add(clave)
-        productos.append(producto)
+        clave = p["url"]
+        if clave not in vistos:
+            vistos.add(clave)
+            productos.append(p)
 
+    # Fallback: buscar directamente enlaces a fichas y subir hasta encontrar
+    # un contenedor que contenga un precio.
     if not productos:
-        # Fallback acotado para layouts no estándar.
-        for a in soup.select("a[href]")[:250]:
-            href = _url(base_url, a.get("href"))
-            if not href or not PRODUCT_PATH_RE.search(urlparse(href).path):
+        for a in soup.select("a[href]"):
+            href = _normalizar_url(_url(base_url, a.get("href")))
+            if not href or not _es_misma_tienda(href, base_url) or not _es_producto_url(href):
                 continue
-            nombre = a.get_text(" ", strip=True) or a.get("title") or ""
             nodo = a
-            mejor = None
-            for _ in range(5):
-                nodo = nodo.parent
-                if nodo is None:
+            for _ in range(6):
+                nodo = nodo.parent if nodo else None
+                if not nodo:
                     break
-                if _precio_card(nodo) and len(nodo.get_text(" ", strip=True)) < 2200:
-                    mejor = nodo
+                if _precio_card(nodo):
+                    p = _extraer_card(nodo, base_url, tienda)
+                    if p and p["url"] == href and href not in vistos:
+                        vistos.add(href)
+                        productos.append(p)
                     break
-            if mejor is None:
-                continue
-            producto = _extraer_card(mejor, base_url, tienda)
-            if producto and producto["url"] == href:
-                if href not in vistos:
-                    vistos.add(href)
-                    productos.append(producto)
     return productos
+
+
+def _extraer_detalle(url, tienda, session=None):
+    try:
+        if session:
+            r = session.get(url, headers=HEADERS, timeout=HTTP_TIMEOUT)
+        else:
+            r = requests.get(url, headers=HEADERS, timeout=HTTP_TIMEOUT)
+        if r.status_code != 200:
+            return None
+    except requests.RequestException:
+        return None
+
+    productos = _extraer_jsonld(r.text, r.url, tienda)
+    if productos:
+        p = productos[0]
+        p["url"] = _normalizar_url(p.get("url") or r.url)
+        return p
+
+    soup = BeautifulSoup(r.text, "html.parser")
+    nombre = None
+    for selector in ("h1", "[itemprop=name]", ".product_title", ".product-name", ".product-title"):
+        nodo = soup.select_one(selector)
+        if nodo and nodo.get_text(" ", strip=True):
+            nombre = nodo.get_text(" ", strip=True)
+            break
+    precio = None
+    for selector in (
+        '[itemprop=price]', 'meta[property="product:price:amount"]',
+        '.price', '.precio', '.product-price', '.price-box', '.special-price',
+        '.sale-price', '.woocommerce-Price-amount', '.amount', '.current-price',
+    ):
+        for nodo in soup.select(selector)[:10]:
+            valor = nodo.get("content") or nodo.get("data-price") or nodo.get_text(" ", strip=True)
+            precio = _precio(valor)
+            if precio:
+                break
+        if precio:
+            break
+    if not nombre or not precio:
+        return None
+
+    imagen = _imagen(soup.select_one('meta[property="og:image"]'), r.url)
+    if not imagen:
+        meta = soup.select_one('meta[property="og:image"]')
+        imagen = _imagen(meta.get("content") if meta else None, r.url)
+    sku_node = soup.select_one("[itemprop=sku], .sku")
+    sku = sku_node.get("content") if sku_node and sku_node.get("content") else (sku_node.get_text(" ", strip=True) if sku_node else r.url)
+    stock = 0 if re.search(r"sin stock|agotado|out of stock|no disponible", soup.get_text(" ", strip=True), re.I) else 1
+    return {
+        "tienda": tienda,
+        "nombre": nombre,
+        "precio": precio,
+        "stock": stock,
+        "imagen": imagen,
+        "url": _normalizar_url(r.url),
+        "id_producto": str(sku or r.url),
+    }
 
 
 def _siguiente_pagina(soup, actual):
@@ -577,21 +452,17 @@ def _siguiente_pagina(soup, actual):
         title = (nodo.get("title") or "").lower()
         if texto in palabras or aria in palabras or title in palabras:
             candidatos.append(nodo.get("href"))
-
     for candidato in candidatos:
         siguiente = _normalizar_url(_url(actual, candidato))
         if siguiente and siguiente != _normalizar_url(actual):
             return siguiente
 
-    # Sólo acepta paginación explícita, jamás un enlace arbitrario.
+    # WooCommerce suele usar /page/2/ y Magento/otros usan ?page=2.
     for nodo in soup.select("a[href]"):
         siguiente = _normalizar_url(_url(actual, nodo.get("href")))
-        if not siguiente:
+        if not siguiente or not _es_misma_tienda(siguiente, actual):
             continue
-        p = urlparse(siguiente)
-        if p.netloc.lower() != urlparse(actual).netloc.lower():
-            continue
-        if PAGE_RE.search(p.query):
+        if PAGE_RE.search(siguiente):
             return siguiente
     return None
 
@@ -605,8 +476,8 @@ def _parse_json_products(data, base_url, tienda):
                 pools.extend(value)
             elif isinstance(value, dict):
                 pools.append(value)
-        if not pools:
-            pools = [data]
+        if not pools and isinstance(data.get("items"), dict):
+            pools = [data["items"]]
     elif isinstance(data, list):
         pools = data
     else:
@@ -616,321 +487,281 @@ def _parse_json_products(data, base_url, tienda):
     for item in pools:
         if not isinstance(item, dict):
             continue
-
         nombre = item.get("name") or item.get("title") or item.get("productName")
         if not nombre:
             continue
-
-        oferta = item.get("offers")
-        if not isinstance(oferta, dict):
-            oferta = item
-
-        precio = (
-            oferta.get("price")
-            or oferta.get("lowPrice")
-            or item.get("price")
-            or item.get("salePrice")
-            or item.get("bestPrice")
+        offers = item.get("offers")
+        if not isinstance(offers, dict):
+            offers = item
+        precio = _precio(
+            offers.get("price") or offers.get("lowPrice") or item.get("price") or
+            item.get("salePrice") or item.get("bestPrice")
         )
-        precio = _precio(precio)
         if not precio:
             continue
-
-        url = _url(
-            base_url,
-            item.get("url") or item.get("link") or item.get("productUrl")
-        )
+        url = _url(base_url, item.get("url") or item.get("link") or item.get("productUrl"))
         if not url and item.get("handle"):
-            parsed = urlparse(base_url)
-            origin = f"{parsed.scheme}://{parsed.netloc}"
-            url = _url(origin, "/products/" + str(item.get("handle")))
-        if not url and item.get("id") and "/rest/" in urlparse(base_url).path:
-            parsed = urlparse(base_url)
-            origin = f"{parsed.scheme}://{parsed.netloc}"
-            url = _url(origin, "/catalog/product/view/?id=" + str(item.get("id")))
-
+            origin = f"{urlparse(base_url).scheme}://{urlparse(base_url).netloc}"
+            url = _url(origin, "/products/" + str(item["handle"]))
+        if not url:
+            continue
+        stock = 0 if item.get("available") is False or item.get("inStock") is False else 1
         producto = {
             "tienda": tienda,
             "nombre": str(nombre).strip(),
             "precio": precio,
-            "stock": 1 if item.get("available", item.get("inStock", True)) else 0,
-            "imagen": _imagen(
-                item.get("image") or item.get("imageUrl") or item.get("thumbnail"),
-                base_url,
-            ),
-            "url": url,
-            "id_producto": str(
-                item.get("id") or item.get("productId")
-                or item.get("sku") or item.get("handle") or url
-            ),
+            "stock": stock,
+            "imagen": _imagen(item.get("image") or item.get("imageUrl") or item.get("thumbnail"), base_url),
+            "url": _normalizar_url(url),
+            "id_producto": str(item.get("id") or item.get("productId") or item.get("sku") or item.get("handle") or url),
         }
-
-        if producto["url"] and _producto_relevante(producto):
+        if _producto_relevante(producto):
             productos.append(producto)
-
     return productos
 
 
-def _descubrir_sitemap(session, base_url, presupuesto):
-    candidatos = []
-    for path in (
+def _descubrir_sitemaps(session, base_url, presupuesto):
+    """Devuelve URLs de fichas de producto descubiertas en sitemaps.
+
+    Se recorren índices recursivamente y no se filtran por palabras de hardware.
+    """
+    raiz = urlparse(base_url)
+    candidatos = [
+        "/sitemap.xml", "/sitemap_index.xml", "/wp-sitemap.xml",
         "/product-sitemap.xml", "/products-sitemap.xml", "/sitemap_products.xml",
-        "/sitemap.xml", "/sitemap_index.xml",
-    ):
+        "/wp-sitemap-posts-product-1.xml",
+    ]
+    cola = []
+    vistos_sitemap = set()
+    productos = set()
+
+    for path in candidatos:
+        u = _normalizar_url(_url(base_url, path))
+        if u:
+            cola.append(u)
+
+    while cola and not presupuesto.vencido() and len(productos) < MAX_SITEMAP_URLS:
+        sitemap = cola.pop(0)
+        if sitemap in vistos_sitemap:
+            continue
+        vistos_sitemap.add(sitemap)
         if not presupuesto.puede_request():
             break
         try:
-            r = session.get(_url(base_url, path), headers=HEADERS, timeout=HTTP_TIMEOUT)
+            r = session.get(sitemap, headers=HEADERS, timeout=HTTP_TIMEOUT)
         except requests.RequestException:
             continue
-        if r.status_code != 200:
+        if r.status_code != 200 or not r.text:
             continue
+
         locs = [unescape(x.strip()) for x in re.findall(r"<loc>\s*(.*?)\s*</loc>", r.text, re.I | re.S)]
-        for loc in locs[:500]:
-            if urlparse(loc).netloc.lower() != urlparse(base_url).netloc.lower():
+        for loc in locs:
+            u = _normalizar_url(loc)
+            if not u or not _es_misma_tienda(u, base_url):
                 continue
-            score = _score_relevancia(loc)
-            if score < 2:
+            if _es_fuente_excluida(u):
                 continue
-            path_l = urlparse(loc).path.lower()
-            if any(x in path_l for x in SOURCE_EXCLUDE):
-                continue
-            candidates.append(("sitemap", loc, score + (3 if PRODUCT_PATH_RE.search(path_l) else 0)))
-        if candidates:
-            break
-
-    candidates.sort(key=lambda x: (-x[2], x[1]))
-    return candidates[:40]
-
-
-def _descubrir_endpoints(html, base_url):
-    encontrados = set()
-    patrones = (
-        r'["\']([^"\']*(?:/api/|/graphql|/products(?:\.json)?|/catalog[^"\']*)["\'])',
-        r'https?://[^"\']+',
-    )
-    for patron in patrones:
-        for match in re.findall(patron, html, re.I):
-            valor = match[0] if isinstance(match, tuple) else match
-            if not valor:
-                continue
-            if not valor.startswith(("http://", "https://", "/")):
-                continue
-            if valor.startswith("/"):
-                valor = _url(base_url, valor)
-            if not valor:
-                continue
-            p = urlparse(valor)
-            if p.netloc.lower() != urlparse(base_url).netloc.lower():
-                continue
-            if any(x in valor.lower() for x in SOURCE_EXCLUDE):
-                continue
-            if any(x in valor.lower() for x in ("/api/", "/graphql", "products.json", "/catalog")):
-                encontrados.add(_normalizar_url(valor))
-    return list(encontrados)[:25]
+            path = urlparse(u).path.lower()
+            if _es_producto_url(u) or ("product" in path and not path.endswith(".xml")):
+                productos.add(u)
+            elif u.lower().endswith(".xml") and len(vistos_sitemap) < 300:
+                cola.append(u)
+            if len(productos) >= MAX_SITEMAP_URLS:
+                break
+    return sorted(productos)
 
 
-def _descubrir_links(html, base_url):
+def _descubrir_links_catalogo(html, base_url):
     soup = BeautifulSoup(html, "html.parser")
-    host = urlparse(base_url).netloc.lower()
     candidatos = []
     vistos = set()
-
     for a in soup.select("a[href]"):
         href = _normalizar_url(_url(base_url, a.get("href")))
-        if not href or href in vistos:
-            continue
-        p = urlparse(href)
-        if p.netloc.lower() != host:
+        if not href or href in vistos or not _es_misma_tienda(href, base_url):
             continue
         vistos.add(href)
-
-        texto = a.get_text(" ", strip=True)
-        datos = f"{href} {texto}"
-        path = p.path.lower()
-        if any(x in datos.lower() for x in SOURCE_EXCLUDE):
+        if _es_fuente_excluida(href) or _es_producto_url(href):
             continue
-        if len(path.split("/")) > 6:
-            continue
-
-        score = _score_relevancia(datos)
-        if any(x in datos.lower() for x in CATEGORY_MARKERS):
-            score += 3
-        if PRODUCT_PATH_RE.search(path):
-            score += 2
-        if score >= 3:
-            candidatos.append(("html", href, score))
-    candidatos.sort(key=lambda x: (-x[2], x[1]))
-    return candidatos[:50]
+        texto = f"{href} {a.get_text(' ', strip=True)}".lower()
+        if any(m in texto for m in PRODUCT_MARKERS) or PAGE_RE.search(href):
+            candidatos.append(href)
+    return candidatos[:200]
 
 
-def _crear_candidatos(config, html, base_url, session, presupuesto):
-    candidatos = []
-    seen = set()
-
-    def add(kind, url, score, reason=""):
-        url = _normalizar_url(url)
-        if not url or url in seen:
-            return
-        if urlparse(url).netloc.lower() != urlparse(base_url).netloc.lower():
-            return
-        if any(x in url.lower() for x in SOURCE_EXCLUDE):
-            return
-        seen.add(url)
-        candidatos.append({"kind": kind, "url": url, "score": score, "reason": reason})
-
-    # Fuentes estructuradas conocidas.
-    plataformas = {str(x).lower() for x in config.get("plataformas", [])}
-    if "shopify" in plataformas:
-        add("shopify", _url(base_url, "/products.json?limit=250"), 100, "plataforma")
-    if "magento" in plataformas:
-        add("magento", _url(base_url, "/rest/V1/products?searchCriteria[pageSize]=100"), 100, "plataforma")
-        add("magento", _url(base_url, "/rest/default/V1/products?searchCriteria[pageSize]=100"), 98, "plataforma")
-
-    for u in config.get("fuentes_prioritarias", [])[:30]:
-        add("config", u, 20, "configuracion previa")
-    for u in config.get("catalog_urls", [])[:40]:
-        add("config", u, 12, "catalogo historico")
-
-    # JSON-LD de portada: si ya hay productos, la propia portada es una fuente válida.
-    if _extraer_jsonld(html, base_url, config["tienda"]):
-        add("jsonld", base_url, 90, "JSON-LD Product")
-
-    for u in _descubrir_endpoints(html, base_url):
-        add("endpoint", u, 70, "endpoint detectado")
-
-    for kind, u, score in _descubrir_links(html, base_url):
-        add(kind, u, score, "enlace relevante")
-
-    for kind, u, score in _descubrir_sitemap(session, base_url, presupuesto):
-        add(kind, u, score, "sitemap filtrado")
-
-    # La portada siempre queda al final como fallback.
-    add("html", base_url, 5, "fallback")
-
-    candidatos.sort(key=lambda x: (-x["score"], x["url"]))
-    return candidatos[:MAX_CANDIDATAS]
-
-
-def _probar_fuente(session, fuente, tienda, presupuesto):
-    if not presupuesto.puede_request():
-        return None, 0
-
-    url = fuente["url"]
-    try:
-        response = session.get(url, headers=HEADERS, timeout=HTTP_TIMEOUT)
-    except requests.RequestException:
-        return None, 0
-
-    if response.status_code != 200:
-        return None, 0
-
-    content_type = (response.headers.get("Content-Type") or "").lower()
-    if "json" in content_type or url.lower().endswith((".json", ".json?")):
+def _api_woocommerce(session, base_url, tienda, presupuesto):
+    """WooCommerce Store API pública. Devuelve productos y si la API respondió."""
+    productos = []
+    page = 1
+    funciono = False
+    while page <= 1000 and not presupuesto.vencido():
+        if not presupuesto.puede_request():
+            break
+        url = _url(base_url, f"/wp-json/wc/store/v1/products?per_page=100&page={page}")
         try:
-            data = response.json()
+            r = session.get(url, headers=HEADERS, timeout=HTTP_TIMEOUT)
+        except requests.RequestException:
+            break
+        if r.status_code != 200:
+            break
+        try:
+            data = r.json()
         except Exception:
-            return None, 0
-        productos = _parse_json_products(data, url, tienda)
-        return productos, len(productos)
+            break
+        if not isinstance(data, list):
+            break
+        funciono = True
+        encontrados = _parse_json_products(data, base_url, tienda)
+        productos.extend(encontrados)
+        if not data:
+            break
+        total_pages = r.headers.get("X-WP-TotalPages")
+        if total_pages:
+            try:
+                if page >= int(total_pages):
+                    break
+            except ValueError:
+                pass
+        if len(data) < 100:
+            break
+        page += 1
+    return productos, funciono
 
-    productos = _extraer_jsonld(response.text, url, tienda)
-    if not productos:
-        productos = _extraer_html(response.text, url, tienda)
-    return productos, len(productos)
+
+def _api_shopify(session, base_url, tienda, presupuesto):
+    productos = []
+    page = 1
+    funciono = False
+    while page <= 1000 and not presupuesto.vencido():
+        if not presupuesto.puede_request():
+            break
+        u = _url(base_url, f"/products.json?limit=250&page={page}")
+        try:
+            r = session.get(u, headers=HEADERS, timeout=HTTP_TIMEOUT)
+        except requests.RequestException:
+            break
+        if r.status_code != 200:
+            break
+        try:
+            data = r.json()
+        except Exception:
+            break
+        items = data.get("products") if isinstance(data, dict) else data
+        if not isinstance(items, list):
+            break
+        funciono = True
+        productos.extend(_parse_json_products(items, base_url, tienda))
+        if len(items) < 250:
+            break
+        page += 1
+    return productos, funciono
+
+
+def _api_magento(session, base_url, tienda, presupuesto):
+    productos = []
+    page = 1
+    funciono = False
+    while page <= 1000 and not presupuesto.vencido():
+        if not presupuesto.puede_request():
+            break
+        u = _url(base_url, f"/rest/V1/products?searchCriteria[currentPage]={page}&searchCriteria[pageSize]=100")
+        try:
+            r = session.get(u, headers=HEADERS, timeout=HTTP_TIMEOUT)
+        except requests.RequestException:
+            break
+        if r.status_code != 200:
+            break
+        try:
+            data = r.json()
+        except Exception:
+            break
+        if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+            break
+        funciono = True
+        for item in data["items"]:
+            nombre = item.get("name")
+            price = _precio(item.get("price"))
+            if not nombre or not price:
+                continue
+            sku = item.get("sku") or ""
+            # Magento REST no siempre devuelve la URL pública. Se conserva el
+            # SKU como identidad y luego se completa desde sitemap/HTML.
+            productos.append({
+                "tienda": tienda, "nombre": str(nombre).strip(), "precio": price,
+                "stock": 1, "imagen": None, "url": _url(base_url, "/catalog/product/view/" + str(sku)),
+                "id_producto": str(sku),
+            })
+        total = data.get("total_count")
+        if total is not None:
+            try:
+                if page * 100 >= int(total):
+                    break
+            except (TypeError, ValueError):
+                pass
+        if len(data["items"]) < 100:
+            break
+        page += 1
+    return productos, funciono
 
 
 def _extraer_fuente_html(session, primera_url, tienda, presupuesto):
-    productos, vistos, visitadas = [], set(), set()
+    productos = []
+    vistos = set()
+    visitadas = set()
     url = primera_url
-    sin_resultados = 0
-
     while url and not presupuesto.vencido() and len(productos) < MAX_PRODUCTOS:
-        normalizada = _normalizar_url(url)
-        if normalizada in visitadas:
+        url = _normalizar_url(url)
+        if not url or url in visitadas:
             break
-        visitadas.add(normalizada)
+        visitadas.add(url)
         presupuesto.paginas += 1
-
         if not presupuesto.puede_request():
             break
-
         try:
-            response = session.get(url, headers=HEADERS, timeout=HTTP_TIMEOUT)
+            r = session.get(url, headers=HEADERS, timeout=HTTP_TIMEOUT)
         except requests.RequestException:
             break
-        if response.status_code != 200:
+        if r.status_code != 200:
             break
-
-        encontrados = _extraer_jsonld(response.text, url, tienda)
+        encontrados = _extraer_jsonld(r.text, r.url, tienda)
         if not encontrados:
-            encontrados = _extraer_html(response.text, url, tienda)
-
-        nuevos = 0
-        for producto in encontrados:
-            if not _producto_relevante(producto):
-                continue
-            clave = producto.get("id_producto") or producto.get("url")
-            if not clave or clave in vistos:
-                continue
-            vistos.add(clave)
-            productos.append(producto)
-            nuevos += 1
-
-        sin_resultados = sin_resultados + 1 if nuevos == 0 else 0
-        if sin_resultados >= MAX_SIN_RESULTADOS:
-            break
-
-        siguiente = _siguiente_pagina(BeautifulSoup(response.text, "html.parser"), url)
+            encontrados = _extraer_html(r.text, r.url, tienda)
+        for p in encontrados:
+            clave = _normalizar_url(p.get("url")) or p.get("id_producto")
+            if clave and clave not in vistos:
+                vistos.add(clave)
+                productos.append(p)
+        siguiente = _siguiente_pagina(BeautifulSoup(r.text, "html.parser"), r.url)
         if not siguiente:
             break
         url = siguiente
+    return productos, len(visitadas)
 
-    return productos
 
+def _extraer_detalles_en_paralelo(urls, tienda, presupuesto):
+    resultados = []
+    if not urls or presupuesto.vencido():
+        return resultados
 
-def _extraer_fuente_json(session, url, tienda, presupuesto, kind):
-    productos = []
-    paginas = 0
-    actual = url
-
-    while actual and not presupuesto.vencido() and paginas < 30:
+    # No se comparte una requests.Session entre hilos para evitar problemas con
+    # adaptadores. Cada worker usa requests con los mismos headers.
+    def uno(url):
+        if presupuesto.vencido():
+            return None
         if not presupuesto.puede_request():
-            break
-        try:
-            response = session.get(actual, headers=HEADERS, timeout=HTTP_TIMEOUT)
-        except requests.RequestException:
-            break
-        if response.status_code != 200:
-            break
-        try:
-            data = response.json()
-        except Exception:
-            break
+            return None
+        return _extraer_detalle(url, tienda)
 
-        encontrados = _parse_json_products(data, actual, tienda)
-        productos.extend(encontrados)
-        paginas += 1
-        presupuesto.paginas += 1
-
-        # Shopify: page=; Magento: currentPage.
-        if kind == "shopify":
-            if len(encontrados) < 50:
-                break
-            sep = "&" if "?" in url else "?"
-            actual = f"{url}{sep}page={paginas + 1}"
-        elif kind == "magento":
-            if len(encontrados) < 100:
-                break
-            base = url.split("?", 1)[0]
-            actual = (
-                f"{base}?searchCriteria[currentPage]={paginas + 1}"
-                f"&searchCriteria[pageSize]=100"
-            )
-        else:
-            break
-
-    return productos
+    workers = min(DETAIL_WORKERS, max(1, len(urls)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futuros = {pool.submit(uno, u): u for u in urls}
+        for futuro in as_completed(futuros):
+            try:
+                p = futuro.result()
+            except Exception:
+                p = None
+            if p:
+                resultados.append(p)
+    return resultados
 
 
 def extraer_desde_config(config):
@@ -938,179 +769,160 @@ def extraer_desde_config(config):
     base_url = _normalizar_url(config["url"])
     presupuesto = Presupuesto()
     session = session_con_reintentos(intentos=1)
+    warnings = []
     productos = []
     vistos = set()
-    warnings = []
-    fuentes_exitosas = []
-    fuentes_consideradas = []
-    complete_signal = False
+    fuentes = []
+    paginas_catalogo = 0
 
     def agregar(lista):
         nuevos = 0
-        for producto in lista or []:
-            if not producto or not _producto_relevante(producto):
+        for p in lista or []:
+            if not p or not _producto_relevante(p):
                 continue
-            producto["tienda"] = tienda
-            clave = producto.get("id_producto") or producto.get("url")
-            if not clave:
-                continue
-            if clave in vistos:
+            p["tienda"] = tienda
+            p["url"] = _normalizar_url(p.get("url"))
+            clave = p.get("url") or p.get("id_producto")
+            if not clave or clave in vistos:
                 continue
             vistos.add(clave)
-            productos.append(producto)
+            productos.append(p)
             nuevos += 1
             if len(productos) >= MAX_PRODUCTOS:
                 break
         presupuesto.productos = len(productos)
         return nuevos
 
-    # Obtener portada una sola vez. Esto también permite detectar caída/bloqueo.
-    if not presupuesto.puede_request():
-        return {
-            "ok": False, "tienda": tienda, "productos": [],
-            "warnings": ["Presupuesto agotado antes de comenzar"],
-            "salud": "TIMEOUT", "completitud": "baja",
-        }
+    if not base_url or not presupuesto.puede_request():
+        return {"ok": False, "tienda": tienda, "productos": [], "warnings": ["No se pudo iniciar"], "salud": "FAILED", "completitud": "baja"}
 
     try:
-        response = session.get(base_url, headers=HEADERS, timeout=HTTP_TIMEOUT)
+        portada = session.get(base_url, headers=HEADERS, timeout=HTTP_TIMEOUT)
     except requests.RequestException as exc:
-        return {
-            "ok": False, "tienda": tienda, "productos": [],
-            "warnings": [f"No se pudo acceder a la portada: {exc}"],
-            "salud": "FAILED", "completitud": "baja",
-        }
+        return {"ok": False, "tienda": tienda, "productos": [], "warnings": [f"Portada inaccesible: {exc}"], "salud": "FAILED", "completitud": "baja"}
 
-    if response.status_code in (401, 403, 429):
-        return {
-            "ok": False, "tienda": tienda, "productos": [],
-            "warnings": [f"Acceso bloqueado o limitado: HTTP {response.status_code}"],
-            "salud": "BLOCKED", "completitud": "baja",
-        }
-    if response.status_code >= 500:
-        return {
-            "ok": False, "tienda": tienda, "productos": [],
-            "warnings": [f"La tienda respondió HTTP {response.status_code}"],
-            "salud": "FAILED", "completitud": "baja",
-        }
-    if response.status_code != 200:
-        return {
-            "ok": False, "tienda": tienda, "productos": [],
-            "warnings": [f"La tienda respondió HTTP {response.status_code}"],
-            "salud": "DISCOVERY_FAILED", "completitud": "baja",
-        }
+    if portada.status_code in (401, 403, 429):
+        return {"ok": False, "tienda": tienda, "productos": [], "warnings": [f"Acceso bloqueado HTTP {portada.status_code}"], "salud": "BLOCKED", "completitud": "baja"}
+    if portada.status_code != 200:
+        return {"ok": False, "tienda": tienda, "productos": [], "warnings": [f"Portada HTTP {portada.status_code}"], "salud": "FAILED", "completitud": "baja"}
 
-    html = response.text
-    inicial = _extraer_jsonld(html, base_url, tienda)
-    agregar(inicial)
-    if inicial:
-        complete_signal = True
-        fuentes_exitosas.append({"url": base_url, "tipo": "jsonld", "productos": len(inicial)})
+    # 1) APIs públicas. Si una API funciona, es la fuente de mayor confianza.
+    plataformas = {str(x).lower() for x in config.get("plataformas", [])}
+    api_productos = []
+    api_ok = False
+    if "shopify" in plataformas:
+        api_productos, api_ok = _api_shopify(session, base_url, tienda, presupuesto)
+        if api_ok:
+            fuentes.append({"tipo": "shopify", "productos": len(api_productos)})
+    elif "tiendanube" in plataformas:
+        # Tiendanube no expone una API pública de catálogo sin token. Se continúa
+        # con sitemap/HTML, que sí es público.
+        pass
+    if "magento" in plataformas and not api_ok:
+        api_productos, api_ok = _api_magento(session, base_url, tienda, presupuesto)
+        if api_ok:
+            fuentes.append({"tipo": "magento", "productos": len(api_productos)})
+    if not api_ok:
+        api_productos, api_ok = _api_woocommerce(session, base_url, tienda, presupuesto)
+        if api_ok:
+            fuentes.append({"tipo": "woocommerce_store_api", "productos": len(api_productos)})
 
-    candidatos = _crear_candidatos(config, html, base_url, session, presupuesto)
-    print(f"[AUTO] Fuentes candidatas: {len(candidatos)}")
+    agregar(api_productos)
 
-    # Primero se prueban fuentes para medir densidad. Sólo se recorren las que
-    # realmente devuelven productos relevantes.
-    usados = 0
-    sin_aporte = 0
-    probados = 0
+    # 2) Sitemap completo: se usa para conocer cuántas fichas existen, sin
+    # aplicar filtros de relevancia.
+    sitemap_urls = _descubrir_sitemaps(session, base_url, presupuesto)
+    sitemap_urls = [u for u in sitemap_urls if _es_producto_url(u)]
+    sitemap_urls = list(dict.fromkeys(sitemap_urls))
+    expected_urls = len(sitemap_urls)
 
-    for fuente in candidatos:
-        if presupuesto.vencido() or usados >= MAX_FUENTES:
+    if sitemap_urls:
+        fuentes.append({"tipo": "sitemap", "urls": expected_urls})
+
+    # 3) Si la API no cubrió todo o el sitemap tiene URLs no presentes en la API,
+    # completar mediante las fichas del sitemap. Esto arregla tiendas mixtas y
+    # APIs incompletas.
+    urls_faltantes = [u for u in sitemap_urls if u not in vistos]
+    if urls_faltantes and not presupuesto.vencido():
+        detalle = _extraer_detalles_en_paralelo(urls_faltantes, tienda, presupuesto)
+        agregar(detalle)
+
+    # 4) Fallback HTML: categorías/tienda y paginación real.
+    # Se ejecuta aunque haya sitemap si la cobertura detectada todavía es baja.
+    html_urls = list(config.get("catalog_urls", []))
+    html_urls.extend(_descubrir_links_catalogo(portada.text, base_url))
+    html_urls = list(dict.fromkeys(_normalizar_url(u) for u in html_urls if u))
+    html_urls = [u for u in html_urls if _es_misma_tienda(u, base_url) and not _es_fuente_excluida(u) and not _es_producto_url(u)]
+
+    # Priorizar URLs de catálogo reales.
+    html_urls.sort(key=lambda u: (0 if any(x in u.lower() for x in ("/tienda", "/productos", "/categoria", "/categorias", "/shop", "/category")) else 1, u))
+    for catalog_url in html_urls[:80]:
+        if presupuesto.vencido():
             break
-        if probados >= PROBE_LIMIT:
-            break
-        probados += 1
-        fuentes_consideradas.append({
-            "url": fuente["url"],
-            "tipo": fuente["kind"],
-            "score": fuente["score"],
-        })
+        antes = len(productos)
+        extraidos, paginas = _extraer_fuente_html(session, catalog_url, tienda, presupuesto)
+        paginas_catalogo += paginas
+        agregar(extraidos)
+        if len(productos) > antes:
+            fuentes.append({"tipo": "html", "url": catalog_url, "productos": len(productos) - antes, "paginas": paginas})
 
-        try:
-            if fuente["kind"] in ("shopify", "magento"):
-                if fuente["kind"] == "shopify":
-                    encontrados = _extraer_fuente_json(
-                        session, fuente["url"].split("?")[0] + "?limit=250",
-                        tienda, presupuesto, "shopify"
-                    )
-                else:
-                    encontrados = _extraer_fuente_json(
-                        session, fuente["url"], tienda, presupuesto, "magento"
-                    )
-            else:
-                probe, densidad = _probar_fuente(session, fuente, tienda, presupuesto)
-                if not probe:
-                    continue
-                # Una página producto es válida sólo como rescate; para categorías
-                # y sitemaps se continúa con paginación.
-                if fuente["kind"] in ("html", "jsonld") and (
-                    PRODUCT_PATH_RE.search(urlparse(fuente["url"]).path)
-                ):
-                    encontrados = probe
-                else:
-                    encontrados = _extraer_fuente_html(
-                        session, fuente["url"], tienda, presupuesto
-                    )
-                    if not encontrados:
-                        encontrados = probe
-            nuevos = agregar(encontrados)
+    # Si no hubo sitemap, la cantidad de URLs de producto encontrada en HTML es
+    # la mejor señal disponible. Se cuenta junto con las fichas extraídas.
+    discovered_from_products = set(sitemap_urls)
+    discovered_from_products.update(
+        p.get("url") for p in productos if p.get("url") and _es_producto_url(p.get("url"))
+    )
+    if expected_urls == 0:
+        expected_urls = len(discovered_from_products)
 
-            if nuevos:
-                usados += 1
-                fuentes_exitosas.append({
-                    "url": fuente["url"],
-                    "tipo": fuente["kind"],
-                    "productos": nuevos,
-                })
-                sin_aporte = 0
-            else:
-                sin_aporte += 1
-        except Exception as exc:
-            warnings.append(f"{fuente['url']}: {exc}")
+    extracted_urls = set(p.get("url") for p in productos if p.get("url"))
+    if expected_urls:
+        cobertura = min(1.0, len(extracted_urls & discovered_from_products) / expected_urls)
+    else:
+        cobertura = 1.0 if productos else 0.0
 
-        # Dos fuentes consecutivas sin aporte tras haber conseguido catálogo
-        # indican baja rentabilidad y evitan recorrer la tienda completa.
-        if productos and sin_aporte >= 2:
-            break
-
-    if not productos:
-        warnings.append("No se encontró un catálogo relevante utilizable.")
-
-    if presupuesto.vencido():
-        warnings.append(
-            f"Circuit breaker: {MAX_SEGUNDOS}s/{MAX_REQUESTS} requests/"
-            f"{MAX_PAGINAS} páginas/{MAX_PRODUCTOS} productos"
-        )
-
-    # Señal de completitud: una fuente estructurada agotó la paginación o se
-    # detectó una portada con JSON-LD; de lo contrario la extracción se considera
-    # como mínimo parcial y el validador conserva el catálogo anterior al fusionar.
     if presupuesto.vencido():
         salud = "PARTIAL" if productos else "TIMEOUT"
         completitud = "media" if productos else "baja"
-    elif productos and (complete_signal or any(x["tipo"] in ("shopify", "magento") for x in fuentes_exitosas)):
-        salud = "HEALTHY"
-        completitud = "alta"
-    elif productos:
+        warnings.append(
+            f"Presupuesto agotado: {presupuesto.requests} requests, {presupuesto.paginas} páginas"
+        )
+    elif productos and expected_urls and cobertura < 0.98:
         salud = "PARTIAL"
         completitud = "media"
+        warnings.append(f"Cobertura de fichas {cobertura:.1%} ({len(extracted_urls & discovered_from_products)}/{expected_urls})")
+    elif productos:
+        salud = "HEALTHY"
+        completitud = "alta"
     else:
         salud = "NO_SOURCE"
+        completitud = "baja"
+        warnings.append("No se encontró ningún producto con precio utilizable")
+
+    # Si sitemap + extracción coinciden, tenemos una señal fuerte de catálogo
+    # completo. Si sólo encontramos una página, jamás la marcamos como completa.
+    if expected_urls and len(extracted_urls & discovered_from_products) == 0:
+        salud = "NO_SOURCE"
+        completitud = "baja"
 
     return {
         "ok": bool(productos),
         "tienda": tienda,
         "productos": productos[:MAX_PRODUCTOS],
-        "con_imagen": sum(1 for x in productos if x.get("imagen")),
+        "con_imagen": sum(1 for p in productos if p.get("imagen")),
         "warnings": warnings,
-        "parcial": salud != "HEALTHY",
         "salud": salud,
         "completitud": completitud,
+        "parcial": salud != "HEALTHY",
         "requests": presupuesto.requests,
-        "paginas": presupuesto.paginas,
-        "fuentes": presupuesto.fuentes,
-        "fuentes_consideradas": fuentes_consideradas,
-        "fuentes_exitosas": fuentes_exitosas,
+        "paginas": presupuesto.paginas + paginas_catalogo,
+        "fuentes": fuentes,
+        "expected_product_urls": expected_urls,
+        "discovered_product_urls": len(discovered_from_products),
+        "extracted_product_urls": len(extracted_urls & discovered_from_products),
+        "coverage": round(cobertura, 4),
     }
+
+
+def extraer():
+    raise RuntimeError("Los extractores automáticos deben definir CONFIG y llamar a extraer_desde_config(CONFIG)")
