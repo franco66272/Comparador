@@ -1,0 +1,23 @@
+name: Exportar proyecto completo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  exportar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Crear ZIP completo
+        run: zip -r tecnoradar_proyecto_completo.zip . -x '.git/*' 'tecnoradar_proyecto_completo.zip'
+      - name: Subir proyecto como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tecnoradar-proyecto-completo
+          path: tecnoradar_proyecto_completo.zip
+          retention-days: 7
