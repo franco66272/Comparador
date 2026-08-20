@@ -5,7 +5,7 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app_fast:app
-    autoDeploy: false
+    autoDeploy: true
     healthCheckPath: /health-fast
     envVars:
       - key: PYTHON_VERSION
