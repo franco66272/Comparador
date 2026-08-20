@@ -12,16 +12,23 @@ on:
       - 'extractores/**'
       - '.github/workflows/actualizar-precios.yml'
 
+# Evita dos actualizaciones simultáneas intentando escribir main a la vez.
+concurrency:
+  group: tecnoradar-actualizacion
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
 jobs:
   actualizar:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 75
     steps:
       - name: Descargar proyecto
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configurar Python
         uses: actions/setup-python@v5
@@ -42,4 +49,5 @@ jobs:
           git add '*.json'
           git diff --cached --quiet && exit 0
           git commit -m "Actualizar catálogo completo"
-          git push
+          git pull --rebase origin main
+          git push origin HEAD:main
