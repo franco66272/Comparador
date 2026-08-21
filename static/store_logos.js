@@ -34,7 +34,18 @@
     "Necxus":"necxus.com.ar",
     "VRX":"vrx.com.ar",
     "37Bytes":"37bytes.com.ar",
-    "Gamer Factory":"gamerfactory.com.ar"
+    "Gamer Factory":"gamerfactory.com.ar",
+    "Click Gaming":"clickgaming.com.ar",
+    "DinoByte":"dinobyte.ar",
+    "Empenio Gamer":"empeniogamer.com.ar",
+    "Golden Tech Store":"goldentechstore.com.ar",
+    "MaxTecno":"maxtecno.com.ar",
+    "Max Tecno":"maxtecno.com.ar",
+    "SCP Hardstore":"scphardstore.com",
+    "Silver Hard":"silverhard.com",
+    "The Gamer Shop":"thegamershop.com.ar",
+    "Universos Gamers":"universosgamers.com.ar",
+    "WizTech":"wiztech.com.ar"
   };
 
   function setFallback(img, domain) {
