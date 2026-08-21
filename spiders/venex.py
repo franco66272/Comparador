@@ -1,6 +1,6 @@
 import scrapy
 import re
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 
 class VenexSpider(scrapy.Spider):
@@ -18,11 +18,10 @@ class VenexSpider(scrapy.Spider):
     def _es_lista(self, href):
         if not href:
             return False
-        url = self._normalizar(href)
-        parsed = urlparse(url)
+        parsed = urlparse(href)
         if parsed.netloc not in {"venex.com.ar", "www.venex.com.ar"}:
             return False
-        if self._es_producto(url):
+        if self._es_producto(href):
             return False
         path = parsed.path.lower()
         return path in {"", "/", "/index.php", "/index.html"} or any(
@@ -36,12 +35,6 @@ class VenexSpider(scrapy.Spider):
                 "/tablets", "/gaming", "/accesorios", "/hogar-y-oficina",
             )
         ) or "page=" in parsed.query or "pagina=" in parsed.query
-
-    def _normalizar(self, href):
-        return self._absolute_url(href)
-
-    def _absolute_url(self, href):
-        return scrapy.Request(href, dont_filter=True).url
 
     def parse(self, response):
         productos = response.css(".item-prod-show .product-box")
@@ -105,8 +98,6 @@ class VenexSpider(scrapy.Spider):
                 "id_producto": id_producto,
             }
 
-        # La portada y las categorías de Venex muestran catálogos paginados.
-        # Recorremos paginación y categorías sin entrar en las fichas individuales.
         candidatos = response.css("a::attr(href)").getall()
         vistos = set()
         for href in candidatos:
