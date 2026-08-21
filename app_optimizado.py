@@ -9,8 +9,8 @@ Mantiene la aplicación existente y evita trabajo repetido en cada petición:
 from datetime import datetime
 import os
 
-import app as base
-from app import app, render_template, request
+import app_base as base
+from app_base import app, render_template, request
 
 _PRODUCT_INDEX = None
 _PRODUCT_INDEX_SIGNATURE = None
