@@ -1,13 +1,10 @@
-"""Validador de catálogos con control de cobertura.
-
-Una extracción sólo puede reemplazar un catálogo anterior cuando demuestra
-que recorrió el catálogo descubierto. Si no lo demuestra, se conserva/fusiona
-el catálogo anterior y la tienda queda marcada como PARTIAL.
-"""
+"""Validador de catálogos con control de cobertura."""
 import json
 import os
 
-CAIDA_MAXIMA_PERMITIDA = 0.50
+# Una caída grande de productos es mucho más probable que sea una extracción
+# parcial que una reducción real del catálogo. En ese caso se conserva/fusiona.
+CAIDA_MAXIMA_PERMITIDA = 0.20
 COBERTURA_MINIMA_PUBLICABLE = 0.98
 PRECIO_MINIMO_RAZONABLE = 100
 
@@ -32,7 +29,6 @@ def _limpiar(productos):
     limpios = []
     duplicados = 0
     descartados = 0
-
     for p in productos or []:
         if not isinstance(p, dict):
             continue
@@ -51,7 +47,6 @@ def _limpiar(productos):
         p["precio"] = precio
         p.setdefault("stock", 0)
         limpios.append(p)
-
     return limpios, duplicados, descartados
 
 
@@ -108,8 +103,6 @@ def _metricas_cobertura(resultado, cantidad_nuevos):
         coverage = float(coverage) if coverage is not None else None
     except (TypeError, ValueError):
         coverage = None
-
-    # Si el extractor declara una cobertura, esa señal tiene prioridad.
     if coverage is not None:
         return expected, extracted, max(0.0, min(1.0, coverage))
     if expected and expected > 0 and extracted is not None:
@@ -122,7 +115,6 @@ def validar_resultado(resultado, path_json):
     warnings = list(resultado.get("warnings") or [])
     anterior = cargar_json_anterior(path_json)
     cantidad_anterior = len(anterior)
-
     nuevos, duplicados, descartados = _limpiar(resultado.get("productos") or [])
     if duplicados:
         warnings.append(f"{duplicados} duplicados eliminados")
@@ -133,100 +125,61 @@ def validar_resultado(resultado, path_json):
     completitud = str(resultado.get("completitud") or "").lower()
     expected, extracted, coverage = _metricas_cobertura(resultado, len(nuevos))
 
-    # Sin resultado utilizable: nunca destruir el catálogo anterior.
     if not resultado.get("ok", False) or not nuevos:
         salud_final = salud or "FAILED"
         if cantidad_anterior:
-            warnings.append(
-                f"Extracción no utilizable; se conserva el catálogo anterior ({cantidad_anterior})"
-            )
+            warnings.append(f"Extracción no utilizable; se conserva el catálogo anterior ({cantidad_anterior})")
             stats = _estadisticas(anterior, [], anterior)
             return anterior, {
-                "ok": False,
-                "tienda": tienda,
-                "productos": cantidad_anterior,
-                "salud": salud_final,
-                "completitud": "baja",
-                "fuente": "catalogo_anterior",
-                "warnings": warnings,
-                "expected_product_urls": expected,
-                "extracted_product_urls": extracted,
-                "coverage": coverage,
-                **stats,
+                "ok": False, "tienda": tienda, "productos": cantidad_anterior,
+                "salud": salud_final, "completitud": "baja", "fuente": "catalogo_anterior",
+                "warnings": warnings, "expected_product_urls": expected,
+                "extracted_product_urls": extracted, "coverage": coverage, **stats,
             }
-
         warnings.append("No existe catálogo anterior para usar como fallback")
         return [], {
-            "ok": False,
-            "tienda": tienda,
-            "productos": 0,
-            "salud": salud_final,
-            "completitud": "baja",
-            "fuente": "sin_catalogo",
-            "warnings": warnings,
-            "expected_product_urls": expected,
-            "extracted_product_urls": extracted,
-            "coverage": coverage,
-            "productos_nuevos": 0,
-            "productos_actualizados": 0,
-            "productos_eliminados": 0,
-            "productos_finales": 0,
+            "ok": False, "tienda": tienda, "productos": 0, "salud": salud_final,
+            "completitud": "baja", "fuente": "sin_catalogo", "warnings": warnings,
+            "expected_product_urls": expected, "extracted_product_urls": extracted,
+            "coverage": coverage, "productos_nuevos": 0, "productos_actualizados": 0,
+            "productos_eliminados": 0, "productos_finales": 0,
         }
 
     porcentaje_vs_anterior = (len(nuevos) / cantidad_anterior) if cantidad_anterior else 1.0
     cobertura_insuficiente = coverage is not None and coverage < COBERTURA_MINIMA_PUBLICABLE
+    caida_sospechosa = bool(cantidad_anterior and porcentaje_vs_anterior < CAIDA_MAXIMA_PERMITIDA)
     parcial = (
         cobertura_insuficiente
+        or caida_sospechosa
         or completitud in {"baja", "media"}
         or salud in {"PARTIAL", "TIMEOUT", "BLOCKED", "DISCOVERY_FAILED", "NO_SOURCE"}
-        or (cantidad_anterior and porcentaje_vs_anterior < CAIDA_MAXIMA_PERMITIDA)
     )
 
     if cobertura_insuficiente:
-        warnings.append(
-            f"Cobertura insuficiente: {coverage:.1%} "
-            f"({extracted if extracted is not None else '?'} / {expected if expected is not None else '?'})"
-        )
+        warnings.append(f"Cobertura insuficiente: {coverage:.1%} ({extracted if extracted is not None else '?'} / {expected if expected is not None else '?'})")
+    if caida_sospechosa:
+        warnings.append(f"Caída sospechosa de catálogo: {len(nuevos)} vs {cantidad_anterior} anteriores ({porcentaje_vs_anterior:.1%})")
 
     if parcial and cantidad_anterior:
         finales = _merge(anterior, nuevos)
-        warnings.append(
-            f"No se reemplaza el catálogo: extracción parcial "
-            f"({len(nuevos)} nuevos vs {cantidad_anterior} anteriores)."
-        )
+        warnings.append(f"No se reemplaza el catálogo: extracción parcial ({len(nuevos)} nuevos vs {cantidad_anterior} anteriores).")
         stats = _estadisticas(anterior, nuevos, finales)
         stats["productos_eliminados"] = 0
         return finales, {
-            "ok": True,
-            "tienda": tienda,
-            "productos": len(finales),
-            "salud": salud or "PARTIAL",
-            "completitud": completitud or "media",
-            "fuente": "fusion_parcial",
-            "warnings": warnings,
-            "expected_product_urls": expected,
-            "extracted_product_urls": extracted,
-            "coverage": coverage,
-            **stats,
+            "ok": True, "tienda": tienda, "productos": len(finales),
+            "salud": salud or "PARTIAL", "completitud": completitud or "media",
+            "fuente": "fusion_parcial", "warnings": warnings,
+            "expected_product_urls": expected, "extracted_product_urls": extracted,
+            "coverage": coverage, **stats,
         }
 
-    # Sólo aquí se reemplaza el catálogo anterior. Los productos ausentes son
-    # considerados realmente eliminados porque la cobertura fue suficiente.
     sin_imagen = sum(1 for p in nuevos if not p.get("imagen"))
     if nuevos and sin_imagen > len(nuevos) * 0.30:
         warnings.append(f"{sin_imagen}/{len(nuevos)} productos sin imagen (>30%)")
-
     stats = _estadisticas(anterior, nuevos, nuevos)
     return nuevos, {
-        "ok": True,
-        "tienda": tienda,
-        "productos": len(nuevos),
-        "salud": "HEALTHY",
-        "completitud": "alta",
-        "fuente": "extraccion_nueva",
-        "warnings": warnings,
-        "expected_product_urls": expected,
-        "extracted_product_urls": extracted,
-        "coverage": coverage if coverage is not None else 1.0,
-        **stats,
+        "ok": True, "tienda": tienda, "productos": len(nuevos), "salud": "HEALTHY",
+        "completitud": "alta", "fuente": "extraccion_nueva", "warnings": warnings,
+        "expected_product_urls": expected, "extracted_product_urls": extracted,
+        "coverage": coverage if coverage is not None else 1.0, **stats,
     }
