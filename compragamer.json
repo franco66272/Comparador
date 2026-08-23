@@ -451,16 +451,6 @@
   },
   {
     "tienda": "CompraGamer",
-    "nombre": "Memoria Patriot Viper DDR4 16GB (2x8GB) 3200MHz Steel",
-    "precio": 250000,
-    "precio_anterior": null,
-    "stock": 0,
-    "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_18242_Memoria_Patriot_Viper_DDR4_16GB__2x8GB__3200MHz_Steel_fd832e79-grn.jpg",
-    "url": "https://compragamer.com/producto/Memoria_Patriot_Viper_DDR4_16GB_2x8GB_3200MHz_Steel_9993",
-    "id_producto": 9993
-  },
-  {
-    "tienda": "CompraGamer",
     "nombre": "Combo Logitech Teclado + Mouse MK470 Wireless",
     "precio": 60000,
     "precio_anterior": null,
@@ -494,7 +484,7 @@
     "nombre": "Disco Solido SSD Team 256GB GX2 530MB/s",
     "precio": 90050,
     "precio_anterior": null,
-    "stock": 2,
+    "stock": 1,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_33801_Disco_Solido_SSD_Team_256GB_GX2_530MB_s_7d116a15-grn.jpg",
     "url": "https://compragamer.com/producto/Disco_Solido_SSD_Team_256GB_GX2_530MB_s_10110",
     "id_producto": 10110
@@ -794,7 +784,7 @@
     "nombre": "Auriculares Logitech G335 White PC/XBOX/PS",
     "precio": 90990,
     "precio_anterior": null,
-    "stock": 10,
+    "stock": 9,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_27936_Auriculares_Logitech_G335_White_PC_XBOX_PS_32282a6d-grn.jpg",
     "url": "https://compragamer.com/producto/Auriculares_Logitech_G335_White_PC_XBOX_PS_12390",
     "id_producto": 12390
@@ -804,7 +794,7 @@
     "nombre": "Memoria Team DDR4 8GB 3200MHz T-Force Delta RGB Black CL16-20-20-40",
     "precio": 135000,
     "precio_anterior": null,
-    "stock": 1,
+    "stock": 2,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_28414_Memoria_Team_DDR4_8GB_3200MHz_T-Force_Delta_RGB_Black_CL16-20-20-40_441c03ab-grn.jpg",
     "url": "https://compragamer.com/producto/Memoria_Team_DDR4_8GB_3200MHz_T_Force_Delta_RGB_Black_CL16_20_20_40_12502",
     "id_producto": 12502
@@ -938,6 +928,16 @@
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_49122_Procesador_Intel_Core_i7_12700F_4.9GHz_Turbo_Socket_1700_Alder_Lake_6fed9cfe-grn.jpg",
     "url": "https://compragamer.com/producto/Procesador_Intel_Core_i7_12700F_4_9GHz_Turbo_Socket_1700_Alder_Lake_12867",
     "id_producto": 12867
+  },
+  {
+    "tienda": "CompraGamer",
+    "nombre": "Memoria Patriot Viper DDR4 32GB (2x16GB) 3200Mhz Steel RGB Black",
+    "precio": 470000,
+    "precio_anterior": null,
+    "stock": 1,
+    "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_30279_Memoria_Patriot_Viper_DDR4_32GB__2x16GB__3200Mhz_Steel_RGB_Black_c832d691-grn.jpg",
+    "url": "https://compragamer.com/producto/Memoria_Patriot_Viper_DDR4_32GB_2x16GB_3200Mhz_Steel_RGB_Black_13014",
+    "id_producto": 13014
   },
   {
     "tienda": "CompraGamer",
@@ -2584,7 +2584,7 @@
     "nombre": "Disco Solido SSD Team 2TB T-Force Vulcan Z 550MB/s",
     "precio": 349050,
     "precio_anterior": null,
-    "stock": 2,
+    "stock": 1,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_41186_Disco_Solido_SSD_Team_2TB_T-Force_Vulcan_Z_550MB_s_2cc86d9e-grn.jpg",
     "url": "https://compragamer.com/producto/Disco_Solido_SSD_Team_2TB_T_Force_Vulcan_Z_550MB_s_16143",
     "id_producto": 16143
@@ -2714,7 +2714,7 @@
     "nombre": "Mouse Redragon King PRO M916 4K Wireless 2.4Ghz Bluetooth White USB-C 50g",
     "precio": 69000,
     "precio_anterior": null,
-    "stock": 6,
+    "stock": 7,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_41775_Mouse_Redragon_King_PRO_M916_4K_Wireless_2.4Ghz_Bluetooth_White_USB-C_50g_2e28c3d1-grn.jpg",
     "url": "https://compragamer.com/producto/Mouse_Redragon_King_PRO_M916_4K_Wireless_2_4Ghz_Bluetooth_White_USB_C_50g_16323",
     "id_producto": 16323
@@ -3054,7 +3054,7 @@
     "nombre": "Mother ASUS ROG CROSSHAIR X870E HERO DDR5 AM5",
     "precio": 1116903,
     "precio_anterior": 1326350,
-    "stock": 3,
+    "stock": 4,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_42187_Mother_ASUS_ROG_CROSSHAIR_X870E_HERO_DDR5_AM5_64c1ab1c-grn.jpg",
     "url": "https://compragamer.com/producto/Mother_ASUS_ROG_CROSSHAIR_X870E_HERO_DDR5_AM5_16445",
     "id_producto": 16445
@@ -3874,7 +3874,7 @@
     "nombre": "Gabinete HYTE Y60 Panda Vidrio Templado 3x120mm Flow FE12 Fans Vertical GPU Mount Inc. Cable Riser PCIe 4x16 USB-C 3.2",
     "precio": 269800,
     "precio_anterior": null,
-    "stock": 5,
+    "stock": 4,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_49232_Gabinete_HYTE_Y60_Panda_Vidrio_Templado_3x120mm_Flow_FE12_Fans_Vertical_GPU_Mount_Inc._Cable_Riser_PCIe_4x16_USB-C_3.2_fd9eaacc-grn.jpg",
     "url": "https://compragamer.com/producto/Gabinete_HYTE_Y60_Panda_Vidrio_Templado_3x120mm_Flow_FE12_Fans_Vertical_GPU_Mount_Inc_Cable_Riser_PCIe_4x16_USB_C_3_2_16965",
     "id_producto": 16965
@@ -4074,7 +4074,7 @@
     "nombre": "Placa de Video ASUS PRIME GeForce RTX 5070 12GB GDDR7 OC",
     "precio": 1560650,
     "precio_anterior": null,
-    "stock": 1,
+    "stock": 0,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_49162_Placa_de_Video_ASUS_PRIME_GeForce_RTX_5070_12GB_GDDR7_OC_1451ff4c-grn.jpg",
     "url": "https://compragamer.com/producto/Placa_de_Video_ASUS_PRIME_GeForce_RTX_5070_12GB_GDDR7_OC_17116",
     "id_producto": 17116
@@ -4694,7 +4694,7 @@
     "nombre": "Placa de Video ASUS DUAL GeForce RTX 5060 Ti 8GB GDDR7 OC",
     "precio": 947110,
     "precio_anterior": null,
-    "stock": 8,
+    "stock": 9,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_46006_Placa_de_Video_ASUS_DUAL_GeForce_RTX_5060_Ti_8GB_GDDR7_OC_b612bea1-grn.jpg",
     "url": "https://compragamer.com/producto/Placa_de_Video_ASUS_DUAL_GeForce_RTX_5060_Ti_8GB_GDDR7_OC_17608",
     "id_producto": 17608
@@ -5904,7 +5904,7 @@
     "nombre": "Mother Asrock B850M STEEL LEGEND WIFI AM5 DDR5",
     "precio": 302130,
     "precio_anterior": 335700,
-    "stock": 2,
+    "stock": 3,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_48039_Mother_Asrock_B850M_STEEL_LEGEND_WIFI_AM5_DDR5_6621d3dd-grn.jpg",
     "url": "https://compragamer.com/producto/Mother_Asrock_B850M_STEEL_LEGEND_WIFI_AM5_DDR5_18400",
     "id_producto": 18400
@@ -5944,7 +5944,7 @@
     "nombre": "Placa de Video ASUS TUF GeForce RTX 5060 8GB GDDR7 Gaming OC",
     "precio": 940150,
     "precio_anterior": null,
-    "stock": 4,
+    "stock": 3,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_48178_Placa_de_Video_ASUS_TUF_GeForce_RTX_5060_8GB_GDDR7_Gaming_OC_ba42656e-grn.jpg",
     "url": "https://compragamer.com/producto/Placa_de_Video_ASUS_TUF_GeForce_RTX_5060_8GB_GDDR7_Gaming_OC_18428",
     "id_producto": 18428
@@ -6694,7 +6694,7 @@
     "nombre": "Fuente XYZ 1000W 80 Plus Gold ATX 3.1 PCIe 5.1 Full Modular HYPERVOLT White",
     "precio": 199850,
     "precio_anterior": null,
-    "stock": 7,
+    "stock": 6,
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_49046_Fuente_XYZ_1000W_80_Plus_Gold_ATX_3.1_PCIe_5.1_Full_Modular_HYPERVOLT_White_4b4a20a6-grn.jpg",
     "url": "https://compragamer.com/producto/Fuente_XYZ_1000W_80_Plus_Gold_ATX_3_1_PCIe_5_1_Full_Modular_HYPERVOLT_White_18740",
     "id_producto": 18740
@@ -7521,6 +7521,16 @@
   },
   {
     "tienda": "CompraGamer",
+    "nombre": "PC Gamer AMD Ryzen 7 9800X3D RTX 5080 Y70 TOUCH CHERRY X870 32GB 1TB SSD NVMe WIFI Water Cooler",
+    "precio": 6434048,
+    "precio_anterior": null,
+    "stock": 1,
+    "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_0_PC_Gamer_AMD_Ryzen_7_9800X3D_RTX_5080_Y70_TOUCH_CHERRY_X870_32GB_1TB_SSD_NVMe_WIFI_Water_Cooler_430e8179-grn.jpg",
+    "url": "https://compragamer.com/producto/PC_Gamer_AMD_Ryzen_7_9800X3D_RTX_5080_Y70_TOUCH_CHERRY_X870_32GB_1TB_SSD_NVMe_WIFI_Water_Cooler_19178",
+    "id_producto": 19178
+  },
+  {
+    "tienda": "CompraGamer",
     "nombre": "PC Gamer AMD Ryzen 5 9600X RTX 5060 8GB Y40 SNOW B850M 16GB 1TB SSD NVMe WIFI Water Cooler",
     "precio": 2570290,
     "precio_anterior": null,
@@ -7828,6 +7838,16 @@
     "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_0_Kit_Mother_ASUS_PRIME_A620M-K___Procesador_AMD_Ryzen_5_8600G_5.0GHz_Turbo_AM5___Wraith_Stealth_Cooler_03cd04f4-grn.jpg",
     "url": "https://compragamer.com/producto/Kit_Mother_ASUS_PRIME_A620M_K_Procesador_AMD_Ryzen_5_8600G_5_0GHz_Turbo_AM5_Wraith_Stealth_Cooler_19232",
     "id_producto": 19232
+  },
+  {
+    "tienda": "CompraGamer",
+    "nombre": "Kit Mother ASUS PRIME B840M-A + Procesador AMD Ryzen 5 8600G 5.0GHz Turbo AM5 + Wraith Stealth Cooler",
+    "precio": 490152,
+    "precio_anterior": null,
+    "stock": 5,
+    "imagen": "https://imagenes.compragamer.com/productos/compragamer_Imganen_general_0_Kit_Mother_ASUS_PRIME_B840M-A___Procesador_AMD_Ryzen_5_8600G_5.0GHz_Turbo_AM5___Wraith_Stealth_Cooler_a991d9cb-grn.jpg",
+    "url": "https://compragamer.com/producto/Kit_Mother_ASUS_PRIME_B840M_A_Procesador_AMD_Ryzen_5_8600G_5_0GHz_Turbo_AM5_Wraith_Stealth_Cooler_19233",
+    "id_producto": 19233
   },
   {
     "tienda": "CompraGamer",
