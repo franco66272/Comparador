@@ -1,6 +1,6 @@
 import json
 import re
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 import scrapy
 
@@ -10,27 +10,49 @@ class VenexSpider(scrapy.Spider):
     allowed_domains = ["venex.com.ar", "www.venex.com.ar"]
 
     custom_settings = {
-        "DEPTH_LIMIT": 12,
-        "CLOSESPIDER_PAGECOUNT": 2500,
-        "CONCURRENT_REQUESTS_PER_DOMAIN": 8,
-        "DOWNLOAD_DELAY": 0.15,
+        "DEPTH_LIMIT": 20,
+        "CLOSESPIDER_PAGECOUNT": 5000,
+        "CONCURRENT_REQUESTS_PER_DOMAIN": 12,
+        "DOWNLOAD_DELAY": 0.1,
         "DOWNLOAD_TIMEOUT": 20,
+        "ROBOTSTXT_OBEY": True,
     }
 
-    # Venex exposes a real internal search/listing endpoint. We use it as an
-    # index instead of relying on the homepage to link every catalog page.
     SEARCH_URL = "https://www.venex.com.ar/resultado-busqueda.htm"
     PAGE_SIZE = 96
 
-    # Broad seed terms. They are discovery seeds, not product filters: every
-    # result page is parsed and deduplicated, including generic/other products.
+    # Explicit category seeds. These are real catalog sections, not keyword
+    # guesses. The spider expands pagination from each section.
+    CATEGORY_SEEDS = [
+        "https://www.venex.com.ar/notebooks?limit=96&page=1",
+        "https://www.venex.com.ar/procesadores?limit=96&page=1",
+        "https://www.venex.com.ar/microprocesadores?limit=96&page=1",
+        "https://www.venex.com.ar/placas-de-video?limit=96&page=1",
+        "https://www.venex.com.ar/memorias-ram?limit=96&page=1",
+        "https://www.venex.com.ar/componentes-de-pc?limit=96&page=1",
+        "https://www.venex.com.ar/componentes-de-pc/discos-solidos-ssd?limit=96&page=1",
+        "https://www.venex.com.ar/monitores?limit=96&page=1",
+        "https://www.venex.com.ar/perifericos?limit=96&page=1",
+        "https://www.venex.com.ar/gabinetes?limit=96&page=1",
+        "https://www.venex.com.ar/fuentes?limit=96&page=1",
+        "https://www.venex.com.ar/motherboards?limit=96&page=1",
+        "https://www.venex.com.ar/pc-de-escritorio?limit=96&page=1",
+        "https://www.venex.com.ar/gaming?limit=96&page=1",
+        "https://www.venex.com.ar/audio?limit=96&page=1",
+        "https://www.venex.com.ar/impresion-y-scanners?limit=96&page=1",
+        "https://www.venex.com.ar/tablets?limit=96&page=1",
+        "https://www.venex.com.ar/sillas-gamers?limit=96&page=1",
+        "https://www.venex.com.ar/conectividad?limit=96&page=1",
+        "https://www.venex.com.ar/accesorios?limit=96&page=1",
+        "https://www.venex.com.ar/camaras-ip?limit=96&page=1",
+    ]
+
+    # Search seeds are only a secondary discovery layer for products/categories
+    # that are not exposed through the top-level category URLs.
     SEARCH_SEEDS = [
-        "notebook", "procesador", "microprocesador", "placa de video", "memoria ram",
-        "ssd", "disco", "monitor", "motherboard", "gabinete", "fuente", "cooler",
-        "teclado", "mouse", "auricular", "joystick", "webcam", "microfono", "router",
-        "wifi", "impresora", "tablet", "silla gamer", "pc gamer", "consola", "playstation",
-        "xbox", "nintendo", "celular", "smartwatch", "audio", "cable", "adaptador",
-        "parlante", "ups", "nas", "camara", "streaming", "accesorio", "gaming",
+        "ryzen", "intel", "rtx", "radeon", "ssd", "nvme", "ddr4", "ddr5",
+        "wifi", "router", "joystick", "teclado", "mouse", "auricular",
+        "webcam", "microfono", "impresora", "tablet", "smartwatch", "gaming",
     ]
 
     BLOCKED_PATHS = (
@@ -39,7 +61,8 @@ class VenexSpider(scrapy.Spider):
     )
 
     def start_requests(self):
-        # Always seed the real search endpoint instead of only the homepage.
+        for url in self.CATEGORY_SEEDS:
+            yield scrapy.Request(url, callback=self.parse, meta={"listing_root": url, "listing_page": 1})
         for term in self.SEARCH_SEEDS:
             yield scrapy.Request(
                 self._search_url(term, 1),
@@ -48,22 +71,8 @@ class VenexSpider(scrapy.Spider):
                 meta={"search_seed": term, "search_page": 1},
             )
 
-        # Also seed the public result pages used by Venex itself for broad
-        # category/search views. These catch products that do not match our
-        # initial terms exactly.
-        yield scrapy.Request(
-            f"{self.SEARCH_URL}?keywords=y&limit={self.PAGE_SIZE}&page=1",
-            callback=self.parse,
-            dont_filter=True,
-            meta={"search_seed": "__broad__", "search_page": 1},
-        )
-
     def _search_url(self, term, page=1):
-        # The endpoint accepts keywords + limit + page. Keep encoding in the
-        # URL so Scrapy handles redirects/canonicalization consistently.
-        from urllib.parse import urlencode
-        params = {"keywords": term, "limit": self.PAGE_SIZE, "page": page}
-        return f"{self.SEARCH_URL}?{urlencode(params)}"
+        return f"{self.SEARCH_URL}?{urlencode({'keywords': term, 'limit': self.PAGE_SIZE, 'page': page})}"
 
     def _same_store(self, url):
         try:
@@ -71,24 +80,24 @@ class VenexSpider(scrapy.Spider):
         except Exception:
             return False
 
+    def _is_blocked(self, url):
+        return any(x in urlparse(url).path.lower() for x in self.BLOCKED_PATHS)
+
     def _is_product(self, url):
         if not url:
             return False
         path = urlparse(url).path.lower()
         return path.endswith(".html") or any(x in path for x in ("/producto/", "/product/", "/productos/"))
 
-    def _is_blocked(self, url):
-        path = urlparse(url).path.lower()
-        return any(x in path for x in self.BLOCKED_PATHS)
-
     def _clean_int(self, value):
         txt = re.sub(r"[^\d]", "", str(value or ""))
         if not txt:
             return None
-        n = int(txt)
-        return n if n >= 100 else None
+        number = int(txt)
+        return number if number >= 100 else None
 
-    def _image(self, img, response):
+    def _image(self, card, response):
+        img = card.css("img")
         if not img:
             return None
         value = (
@@ -112,7 +121,6 @@ class VenexSpider(scrapy.Spider):
         )
         if not link:
             return None
-
         href = link.attrib.get("href")
         if not href:
             return None
@@ -120,24 +128,21 @@ class VenexSpider(scrapy.Spider):
         if not self._same_store(url) or not self._is_product(url) or self._is_blocked(url):
             return None
 
-        name = link.xpath("string(.)").get() or link.attrib.get("title") or ""
-        name = name.strip()
+        name = (link.xpath("string(.)").get() or link.attrib.get("title") or "").strip()
         if len(name) < 3:
             return None
 
-        price_node = card.css(
-            ".current-price, .product-box-price, .price, [itemprop=price], [data-price], .special-price"
-        )
-        price = self._clean_int(price_node.xpath("string(.)").get() if price_node else None)
+        price_nodes = card.css(".current-price, .product-box-price, .price, [itemprop=price], [data-price], .special-price")
+        price = self._clean_int(price_nodes.xpath("string(.)").get() if price_nodes else None)
         if not price:
-            # Search card text as a final fallback.
-            price = self._clean_int(re.search(r"\$\s*[\d.]+", card.xpath("string(.)").get() or "").group(0) if re.search(r"\$\s*[\d.]+", card.xpath("string(.)").get() or "") else None)
+            text = card.xpath("string(.)").get() or ""
+            match = re.search(r"\$\s*[\d.]+(?:,\d+)?", text)
+            price = self._clean_int(match.group(0) if match else None)
         if not price:
             return None
 
-        old_node = card.css(".product-box-old-price, .old-price")
-        old_price = self._clean_int(old_node.xpath("string(.)").get() if old_node else None)
-
+        old_nodes = card.css(".product-box-old-price, .old-price")
+        old_price = self._clean_int(old_nodes.xpath("string(.)").get() if old_nodes else None)
         onclick = link.attrib.get("onclick", "")
         match = re.search(r'"id":"([^"]+)"', onclick)
         product_id = match.group(1) if match else None
@@ -151,7 +156,7 @@ class VenexSpider(scrapy.Spider):
             "precio": price,
             "precio_anterior": old_price,
             "stock": 1,
-            "imagen": self._image(card.css("img").get() and card.css("img")[0], response),
+            "imagen": self._image(card, response),
             "url": url,
             "id_producto": product_id,
         }
@@ -170,7 +175,6 @@ class VenexSpider(scrapy.Spider):
             cards = response.css(selector)
             if len(cards) > len(best):
                 best = cards
-
         for card in best:
             product = self._extract_card(card, response)
             if product:
@@ -214,114 +218,103 @@ class VenexSpider(scrapy.Spider):
                 elif isinstance(obj, list):
                     stack.extend(obj)
 
-    def _listing_total_pages(self, response):
-        # Prefer explicit pagination links / data-total-pages when present.
-        candidates = []
-        for attr in (
-            "data-total-pages", "data-pages", "data-totalpages",
-        ):
-            value = response.css(f"[{attr}]::attr({attr})").get()
-            if value and value.isdigit():
-                candidates.append(int(value))
-        for href in response.css("a[href]").xpath("@href").getall():
-            if "page=" not in href.lower() and "pagina=" not in href.lower():
-                continue
-            qs = parse_qs(urlparse(response.urljoin(href)).query)
-            for key in ("page", "pagina"):
-                if key in qs:
-                    try:
-                        candidates.append(int(qs[key][0]))
-                    except Exception:
-                        pass
-        # If no page count is exposed, infer from pagination controls by taking
-        # the highest numeric page we can see.
-        for text in response.css(".pagination a::text, .pager a::text").getall():
-            if str(text).strip().isdigit():
-                candidates.append(int(str(text).strip()))
-        return max(candidates) if candidates else None
-
-    def _follow_listing_pagination(self, response):
-        seen = set()
-        # Explicit next link first.
-        for href in response.css('a[rel="next"]::attr(href), a.next::attr(href)').getall():
-            url = response.urljoin(href)
-            if url not in seen and self._same_store(url):
-                seen.add(url)
-                yield scrapy.Request(url, callback=self.parse, meta={"from_pagination": True})
-
-        current_page = 1
+    def _current_page(self, response):
+        qs = parse_qs(urlparse(response.url).query)
         for key in ("page", "pagina"):
-            values = parse_qs(urlparse(response.url).query).get(key)
-            if values:
+            if qs.get(key):
                 try:
-                    current_page = int(values[0])
+                    return max(1, int(qs[key][0]))
                 except Exception:
                     pass
-                break
+        return 1
 
-        total = self._listing_total_pages(response)
-        if total and total <= 100:
-            # Hard cap avoids infinite pagination loops.
-            for page in range(current_page + 1, total + 1):
-                url = response.url
-                from urllib.parse import parse_qsl, urlencode, urlunparse
-                parsed = urlparse(url)
-                qs = dict(parse_qsl(parsed.query, keep_blank_values=True))
-                qs["page"] = str(page)
-                next_url = urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, urlencode(qs), parsed.fragment))
-                if next_url not in seen:
-                    seen.add(next_url)
-                    yield scrapy.Request(next_url, callback=self.parse, meta={"from_pagination": True})
-        else:
-            # Generic search/listing fallback: advance pages until a page has no
-            # products. This is useful when the site does not expose total pages.
-            next_page = current_page + 1
-            url = self._search_url(response.meta.get("search_seed", ""), next_page) if response.meta.get("search_seed") else None
-            if url and url not in seen:
-                seen.add(url)
-                yield scrapy.Request(url, callback=self.parse, meta={"search_seed": response.meta.get("search_seed", ""), "search_page": next_page})
+    def _page_url(self, response_url, page):
+        parsed = urlparse(response_url)
+        qs = dict((k, v[-1]) for k, v in parse_qs(parsed.query).items())
+        qs["limit"] = str(self.PAGE_SIZE)
+        qs["page"] = str(page)
+        return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, urlencode(qs), parsed.fragment))
+
+    def _pagination_pages(self, response):
+        pages = set()
+        for href in response.css("a[href]::attr(href)").getall():
+            url = response.urljoin(href)
+            if not self._same_store(url):
+                continue
+            qs = parse_qs(urlparse(url).query)
+            for key in ("page", "pagina"):
+                for value in qs.get(key, []):
+                    if str(value).isdigit():
+                        pages.add(int(value))
+        for text in response.css(".pagination a::text, .pager a::text, .pagination li::text").getall():
+            text = str(text).strip()
+            if text.isdigit():
+                pages.add(int(text))
+        return pages
+
+    def _follow_pagination(self, response, yielded_count):
+        current = self._current_page(response)
+        pages = self._pagination_pages(response)
+        if pages:
+            target = max(pages)
+            for page in range(current + 1, min(target, current + 99) + 1):
+                yield scrapy.Request(
+                    self._page_url(response.url, page),
+                    callback=self.parse,
+                    meta={
+                        "search_seed": response.meta.get("search_seed"),
+                        "listing_root": response.meta.get("listing_root") or response.url,
+                        "listing_page": page,
+                    },
+                )
+        elif yielded_count >= 40:
+            # Many Venex listings do not expose a clean total page count. If a
+            # full-ish page is returned, continue sequentially until an empty
+            # page is encountered. The spider close/page limits stop runaway loops.
+            next_page = current + 1
+            yield scrapy.Request(
+                self._page_url(response.url, next_page),
+                callback=self.parse,
+                meta={
+                    "search_seed": response.meta.get("search_seed"),
+                    "listing_root": response.meta.get("listing_root") or response.url,
+                    "listing_page": next_page,
+                },
+            )
 
     def parse(self, response):
-        # Always extract what is directly visible on the listing page.
         yielded = 0
-        seen_urls = set()
+        seen = set()
         for product in self._extract_cards(response):
-            if product["url"] in seen_urls:
+            if product["url"] in seen:
                 continue
-            seen_urls.add(product["url"])
+            seen.add(product["url"])
             yielded += 1
             yield product
 
-        # JSON-LD gives additional products on some catalog pages.
         if yielded == 0:
             for product in self._extract_jsonld_products(response):
                 yield product
 
-        # Follow internal listing pagination from this exact listing URL.
-        yield from self._follow_listing_pagination(response)
+        yield from self._follow_pagination(response, yielded)
 
-        # Discover other category/listing/search links from the current page.
-        if response.meta.get("search_seed") in (None, "__broad__"):
-            seen = set()
-            for a in response.css("a[href]"):
-                href = a.attrib.get("href")
-                if not href:
-                    continue
-                url = response.urljoin(href)
-                if not self._same_store(url) or url in seen or self._is_blocked(url):
-                    continue
-                if self._is_product(url):
-                    # Do not request every product individually here; listing
-                    # pages already contain the structured product data.
-                    continue
-                seen.add(url)
-                text = (a.xpath("string(.)").get() or "").strip().lower()
-                path = urlparse(url).path.lower()
-                query = urlparse(url).query.lower()
-                looks_like_listing = (
-                    any(k in path for k in ("/notebook", "/component", "/perifer", "/memoria", "/monitor", "/disco", "/placa", "/pc-de-escritorio", "/gaming", "/audio", "/impres", "/table", "/silla", "/almacen", "/conect", "/acces"))
-                    or any(k in text for k in ("notebook", "procesador", "memoria", "placa", "monitor", "almacenamiento", "periferico", "gabinete", "fuente", "gaming"))
-                    or any(k in query for k in ("page=", "pagina=", "vmm=", "man=", "opt=", "cat=", "sort="))
+        # Discover real category/listing links from category/search pages. Do
+        # this only for the first page of each listing to limit redundant work.
+        current = self._current_page(response)
+        if current != 1:
+            return
+        for a in response.css("a[href]"):
+            href = a.attrib.get("href")
+            if not href:
+                continue
+            url = response.urljoin(href)
+            if not self._same_store(url) or self._is_blocked(url) or self._is_product(url):
+                continue
+            path = urlparse(url).path.lower()
+            text = (a.xpath("string(.)").get() or "").strip().lower()
+            if any(k in path for k in ("/notebook", "/microproces", "/procesador", "/placa", "/memoria", "/monitor", "/disco", "/perifer", "/gabinete", "/fuente", "/mother", "/componente", "/pc-de-escritorio", "/gaming", "/audio", "/impres", "/tablet", "/silla", "/conect", "/acces", "/camara")) or any(k in text for k in ("notebook", "procesador", "placa", "memoria", "monitor", "almacenamiento", "perifericos", "gaming")):
+                yield scrapy.Request(
+                    self._page_url(url, 1),
+                    callback=self.parse,
+                    meta={"listing_root": url, "listing_page": 1},
                 )
-                if looks_like_listing:
-                    yield scrapy.Request(url, callback=self.parse, meta={"category_seed": text[:80]})
