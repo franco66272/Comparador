@@ -17,55 +17,53 @@ class VenexSpider(scrapy.Spider):
         "CONCURRENT_REQUESTS_PER_DOMAIN": 4,
         "DOWNLOAD_DELAY": 0.15,
         "DOWNLOAD_TIMEOUT": 20,
-        "CLOSESPIDER_PAGECOUNT": 1400,
+        "CLOSESPIDER_PAGECOUNT": 1200,
     }
 
+    # Broad roots taken from the site's visible catalog structure.
     CATEGORY_SEEDS = [
-        "/notebooks/", "/microprocesadores/", "/placas-de-video/", "/memorias-ram/",
-        "/componentes-de-pc/", "/monitores/", "/perifericos/", "/almacenamiento/",
-        "/discos/", "/sillas-gamers/", "/pc-de-escritorio/", "/gaming/",
-        "/conectividad/", "/audio/", "/impresion-y-scanners/", "/tablets/",
-        "/camaras-ip/", "/relojes-smartwatch/", "/accesorios/", "/impresoras/",
-        "/telefonia/", "/hogar-y-oficina/", "/fuentes/", "/gabinetes/", "/motherboards/",
+        "/hogar-y-oficina/", "/notebooks/", "/microprocesadores/", "/perifericos/",
+        "/almacenamiento-portatil/", "/almacenamiento/", "/placas-de-video/",
+        "/componentes-de-pc/", "/pc-de-escritorio/", "/memorias-ram/", "/monitores/",
+        "/sillas-gamers/", "/accesorios/", "/impresion-y-scanners/", "/tablets/",
+        "/camaras-ip/", "/relojes-smartwatch/", "/audio/", "/conectividad/",
     ]
 
     SEARCH_TERMS = [
-        "notebook", "procesador", "placa de video", "memoria ram", "ssd", "disco",
-        "monitor", "motherboard", "gabinete", "fuente", "cooler", "teclado", "mouse",
+        "notebook", "procesador", "placa de video", "memoria ram", "ssd", "monitor",
+        "motherboard", "gabinete", "fuente", "cooler", "teclado", "mouse",
         "auricular", "joystick", "webcam", "microfono", "router", "wifi", "impresora",
         "tablet", "silla gamer", "pc gamer", "consola", "playstation", "xbox", "nintendo",
-        "celular", "smartwatch", "audio", "cable", "adaptador", "camara", "kingston",
-        "asus", "msi", "lenovo", "hp", "intel", "amd", "nvidia",
+        "smartwatch", "cable", "adaptador", "camara", "kingston", "asus", "msi", "lenovo",
+        "hp", "intel", "amd", "nvidia",
     ]
+
+    CATEGORY_HINTS = (
+        "/notebook", "/microproces", "/placa", "/memoria", "/monitor", "/disco", "/almacen",
+        "/component", "/perifer", "/pc-de-escritorio", "/gaming", "/audio", "/impres",
+        "/tablet", "/silla", "/conect", "/acces", "/camara", "/reloj", "/hogar",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.seen_product_ids = set()
         self.seen_listing_urls = set()
-        self.branch_new_counts = {}
+        self.discovered_categories = set()
 
     async def start(self):
-        # Categories are the primary catalog source.
         for path in self.CATEGORY_SEEDS:
             url = self.listing_url(self.BASE + path, 1)
             if url not in self.seen_listing_urls:
                 self.seen_listing_urls.add(url)
-                yield scrapy.Request(
-                    url,
-                    callback=self.parse_listing,
-                    meta={"kind": "category", "branch": path, "page": 1},
-                )
+                yield scrapy.Request(url, callback=self.parse_listing,
+                                     meta={"kind": "category", "branch": path, "page": 1, "discover_children": True})
 
-        # Searches are secondary discovery. They are intentionally limited.
         for term in self.SEARCH_TERMS:
             url = self.search_url(term, 1)
             if url not in self.seen_listing_urls:
                 self.seen_listing_urls.add(url)
-                yield scrapy.Request(
-                    url,
-                    callback=self.parse_listing,
-                    meta={"kind": "search", "branch": term, "page": 1},
-                )
+                yield scrapy.Request(url, callback=self.parse_listing,
+                                     meta={"kind": "search", "branch": term, "page": 1, "discover_children": False})
 
     def search_url(self, term, page):
         return f"{self.SEARCH}?{urlencode({'keywords': term, 'limit': self.LIMIT, 'page': page})}"
@@ -77,7 +75,7 @@ class VenexSpider(scrapy.Spider):
         q["limit"] = str(self.LIMIT)
         q["page"] = str(page)
         path = p.path or "/"
-        for _ in range(3):
+        for _ in range(4):
             new_path = re.sub(r"/([^/]+)/\1(?=/|$)", r"/\1", path, flags=re.I)
             if new_path == path:
                 break
@@ -106,11 +104,9 @@ class VenexSpider(scrapy.Spider):
         return n if n >= 100 else None
 
     def extract_card(self, card, response):
-        link = (
-            card.css(".product-box-title a") or card.css(".product-title a") or
-            card.css(".product-name a") or card.css("h2 a") or card.css("h3 a") or
-            card.css("a[href]")
-        )
+        link = (card.css(".product-box-title a") or card.css(".product-title a") or
+                card.css(".product-name a") or card.css("h2 a") or card.css("h3 a") or
+                card.css("a[href]"))
         if not link:
             return None
         href = link.attrib.get("href")
@@ -122,7 +118,6 @@ class VenexSpider(scrapy.Spider):
         name = (link.xpath("string(.)").get() or link.attrib.get("title") or "").strip()
         if len(name) < 3:
             return None
-
         node = card.css(".current-price, .product-box-price, .price, [itemprop=price], [data-price], .special-price")
         raw = node.xpath("string(.)").get() if node else None
         price = self.price(raw)
@@ -131,38 +126,31 @@ class VenexSpider(scrapy.Spider):
             price = self.price(m.group(0)) if m else None
         if not price:
             return None
-
         old = card.css(".product-box-old-price, .old-price")
         old_price = self.price(old.xpath("string(.)").get()) if old else None
         img = card.css("img")[:1]
         image = None
         if img:
-            src = (
-                img.attrib.get("data-zoom-image") or img.attrib.get("data-large-image") or
-                img.attrib.get("data-original") or img.attrib.get("data-lazy-src") or
-                img.attrib.get("data-src") or img.attrib.get("src")
-            )
+            src = (img.attrib.get("data-zoom-image") or img.attrib.get("data-large-image") or
+                   img.attrib.get("data-original") or img.attrib.get("data-lazy-src") or
+                   img.attrib.get("data-src") or img.attrib.get("src"))
             if src:
                 image = response.urljoin(src)
         m = re.search(r'"id":"([^"]+)"', link.attrib.get("onclick", ""))
         product_id = m.group(1) if m else card.css("[itemprop=sku]::attr(content), .sku::text").get()
         key = (product_id or url).strip()
-        return {
-            "tienda": "Venex", "nombre": name, "precio": price,
-            "precio_anterior": old_price, "stock": 1, "imagen": image,
-            "url": url, "id_producto": key,
-        }
+        return {"tienda": "Venex", "nombre": name, "precio": price,
+                "precio_anterior": old_price, "stock": 1, "imagen": image,
+                "url": url, "id_producto": key}
 
     def extract_products(self, response):
-        selectors = (
-            ".item-prod-show .product-box", ".product-box", ".product-item",
-            ".product-card", "article.product", "[itemtype*='Product']"
-        )
+        selectors = (".item-prod-show .product-box", ".product-box", ".product-item",
+                     ".product-card", "article.product", "[itemtype*='Product']")
         best = max((response.css(s) for s in selectors), key=len, default=[])
         for card in best:
-            product = self.extract_card(card, response)
-            if product:
-                yield product
+            p = self.extract_card(card, response)
+            if p:
+                yield p
 
     def jsonld_products(self, response):
         for raw in response.css('script[type="application/ld+json"]::text').getall():
@@ -186,13 +174,10 @@ class VenexSpider(scrapy.Spider):
                             image = obj.get("image")
                             if isinstance(image, list):
                                 image = image[0] if image else None
-                            yield {
-                                "tienda": "Venex", "nombre": name, "precio": price,
-                                "precio_anterior": None, "stock": 1,
-                                "imagen": response.urljoin(image) if isinstance(image, str) else None,
-                                "url": response.url,
-                                "id_producto": str(obj.get("sku") or response.url),
-                            }
+                            yield {"tienda": "Venex", "nombre": name, "precio": price,
+                                   "precio_anterior": None, "stock": 1,
+                                   "imagen": response.urljoin(image) if isinstance(image, str) else None,
+                                   "url": response.url, "id_producto": str(obj.get("sku") or response.url)}
                     for value in obj.values():
                         if isinstance(value, (dict, list)):
                             stack.append(value)
@@ -206,57 +191,55 @@ class VenexSpider(scrapy.Spider):
         except (ValueError, TypeError):
             return 1
 
-    def branch_key(self, response):
-        return response.meta.get("branch") or response.urlparse(response.url).path
+    def discover_child_categories(self, response):
+        found = set()
+        for href in response.css("a[href]::attr(href)").getall():
+            url = response.urljoin(href)
+            if not self.same_store(url) or self.is_product(url):
+                continue
+            normalized = self.listing_url(url, 1)
+            if normalized in self.seen_listing_urls or normalized in self.discovered_categories:
+                continue
+            path = urlparse(normalized).path.lower()
+            if not any(hint in path for hint in self.CATEGORY_HINTS):
+                continue
+            if "resultado-busqueda" in path:
+                continue
+            found.add(normalized)
+        return found
 
     def parse_listing(self, response):
         products = list(self.extract_products(response))
         if not products:
             products = list(self.jsonld_products(response))
 
-        new_products = []
         for product in products:
             key = str(product.get("id_producto") or product.get("url") or "").strip()
             if not key or key in self.seen_product_ids:
                 continue
             self.seen_product_ids.add(key)
-            new_products.append(product)
             yield product
 
         current = self.current_page(response)
         kind = response.meta.get("kind")
-        branch = response.meta.get("branch") or response.url
-        previous_new = self.branch_new_counts.get(branch, None)
-        self.branch_new_counts[branch] = len(new_products)
 
-        if not products:
-            return
+        if response.meta.get("discover_children") and current == 1:
+            for child in self.discover_child_categories(response):
+                self.discovered_categories.add(child)
+                self.seen_listing_urls.add(child)
+                yield scrapy.Request(child, callback=self.parse_listing,
+                                     meta={"kind": "category", "page": 1, "discover_children": False})
 
-        # Do not stop merely because a page overlaps another branch. Stop only
-        # after an empty page, or after two consecutive pages contribute zero new
-        # products within this same branch.
-        zero_streak = response.meta.get("zero_streak", 0)
-        if current > 1 and len(new_products) == 0:
-            zero_streak += 1
-        else:
-            zero_streak = 0
-        if zero_streak >= 2:
-            return
-
-        # More coverage without allowing runaway search branches.
-        max_pages = 10 if kind == "search" else 14
-        if current >= max_pages:
+        max_pages = 12 if kind == "category" else 6
+        if current >= max_pages or not products:
             return
 
         next_url = self.listing_url(response.url, current + 1)
         if next_url in self.seen_listing_urls:
             return
         self.seen_listing_urls.add(next_url)
-        yield scrapy.Request(
-            next_url,
-            callback=self.parse_listing,
-            meta={**response.meta, "page": current + 1, "zero_streak": zero_streak},
-        )
+        yield scrapy.Request(next_url, callback=self.parse_listing,
+                             meta={**response.meta, "page": current + 1, "discover_children": False})
 
     def parse(self, response):
         yield from self.parse_listing(response)
