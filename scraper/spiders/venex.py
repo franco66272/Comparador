@@ -18,7 +18,8 @@ class VenexSpider(scrapy.Spider):
         "CONCURRENT_REQUESTS_PER_DOMAIN": 4,
         "DOWNLOAD_DELAY": 0.15,
         "DOWNLOAD_TIMEOUT": 20,
-        "CLOSESPIDER_PAGECOUNT": 2500,
+        "CLOSESPIDER_PAGECOUNT": 3000,
+        "DUPEFILTER_DEBUG": False,
     }
 
     CATEGORY_SEEDS = [
@@ -40,26 +41,25 @@ class VenexSpider(scrapy.Spider):
     ]
 
     async def start(self):
-        """Scrapy 2.18 removed start_requests(); initial requests must be yielded here."""
         seen = set()
         for path in self.CATEGORY_SEEDS:
             url = self.listing_url(self.BASE + path, 1)
             if url not in seen:
                 seen.add(url)
                 yield scrapy.Request(url, callback=self.parse_listing,
-                                     meta={"kind": "category", "page": 1})
+                                     meta={"kind": "category", "page": 1, "seed": path, "discover": False})
 
         for term in self.SEARCH_TERMS:
             url = self.search_url(term, 1)
             if url not in seen:
                 seen.add(url)
                 yield scrapy.Request(url, callback=self.parse_listing,
-                                     meta={"kind": "search", "term": term, "page": 1})
+                                     meta={"kind": "search", "term": term, "page": 1, "discover": False})
 
         url = self.search_url("y", 1)
         if url not in seen:
             yield scrapy.Request(url, callback=self.parse_listing,
-                                 meta={"kind": "search", "term": "y", "page": 1, "broad": True})
+                                 meta={"kind": "search", "term": "y", "page": 1, "broad": True, "discover": False})
 
     def search_url(self, term, page):
         return f"{self.SEARCH}?{urlencode({'keywords': term, 'limit': self.LIMIT, 'page': page})}"
@@ -67,9 +67,13 @@ class VenexSpider(scrapy.Spider):
     def listing_url(self, url, page):
         p = urlparse(url)
         q = {k: (v[-1] if isinstance(v, list) else v) for k, v in parse_qs(p.query, keep_blank_values=True).items()}
+        q.pop("pagina", None)
         q["limit"] = str(self.LIMIT)
         q["page"] = str(page)
-        return urlunparse((p.scheme or "https", p.netloc or "www.venex.com.ar", p.path or "/", p.params, urlencode(q), p.fragment))
+        # Normalise duplicated path fragments created by malformed category links.
+        path = re.sub(r"/(\w+)\1(?:/|$)", r"/\1/", p.path or "/", flags=re.I)
+        path = re.sub(r"/{2,}", "/", path)
+        return urlunparse((p.scheme or "https", p.netloc or "www.venex.com.ar", path, p.params, urlencode(q), p.fragment))
 
     @staticmethod
     def same_store(url):
@@ -80,6 +84,8 @@ class VenexSpider(scrapy.Spider):
 
     @staticmethod
     def is_product(url):
+        if not url:
+            return False
         path = urlparse(url).path.lower()
         return path.endswith(".html") or any(x in path for x in ("/producto/", "/product/", "/productos/"))
 
@@ -209,13 +215,18 @@ class VenexSpider(scrapy.Spider):
         return count >= self.LIMIT
 
     def discover_categories(self, response):
+        seen = set()
         for href in response.css("a[href]::attr(href)").getall():
             url = response.urljoin(href)
             if not self.same_store(url) or self.is_product(url) or self.blocked(url):
                 continue
-            path = urlparse(url).path.lower()
+            normalized = self.listing_url(url, 1)
+            if normalized in seen:
+                continue
+            path = urlparse(normalized).path.lower()
             if any(x in path for x in ("/notebook", "/microproces", "/placa", "/memoria", "/monitor", "/disco", "/almacen", "/component", "/perifer", "/pc-de-escritorio", "/gaming", "/audio", "/impres", "/tablet", "/silla", "/conect", "/acces", "/camara", "/reloj")):
-                yield self.listing_url(url, 1)
+                seen.add(normalized)
+                yield normalized
 
     def parse_listing(self, response):
         products = list(self.extract_products(response))
@@ -226,11 +237,12 @@ class VenexSpider(scrapy.Spider):
 
         current = self.current_page(response)
         if current < 200 and self.has_next(response, len(products)):
-            yield scrapy.Request(self.listing_url(response.url, current + 1),
-                                 callback=self.parse_listing,
-                                 meta={**response.meta, "page": current + 1})
+            next_url = self.listing_url(response.url, current + 1)
+            # Avoid revisiting the same page URL through multiple discovery paths.
+            yield scrapy.Request(next_url, callback=self.parse_listing,
+                                 meta={**response.meta, "page": current + 1, "discover": False})
 
-        if current == 1 and not self.is_product(response.url) and response.meta.get("discover", True):
+        if current == 1 and response.meta.get("discover", False):
             for url in self.discover_categories(response):
                 yield scrapy.Request(url, callback=self.parse_listing,
                                      meta={"kind": "category", "page": 1, "discover": False})
