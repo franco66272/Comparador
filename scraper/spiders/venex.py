@@ -99,7 +99,6 @@ class VenexSpider(scrapy.Spider):
         s = re.sub(r"[^0-9.,]", "", s)
         if not s:
             return None
-        # Argentine display prices use dots as thousands separators and may use comma decimals.
         if "," in s and "." in s:
             s = s.split(",", 1)[0].replace(".", "")
         elif "," in s:
@@ -113,15 +112,14 @@ class VenexSpider(scrapy.Spider):
         return n if n >= 1000 else None
 
     def _find_price(self, node):
-        # Prefer semantic price attributes/elements. These avoid confusing model numbers
-        # (e.g. 1404, 620) with the actual displayed price.
         selectors = [
             "[itemprop='price']::attr(content)",
             "[itemprop='price']::text",
             "[data-price]::attr(data-price)",
             "[data-product-price]::attr(data-product-price)",
+            "[data-price-amount]::attr(data-price-amount)",
             ".price::text", ".current-price::text", ".product-price::text",
-            ".product-box-price::text", ".special-price::text",
+            ".product-box-price::text", ".special-price::text", ".price-final::text",
         ]
         for selector in selectors:
             for raw in node.css(selector).getall():
@@ -129,10 +127,9 @@ class VenexSpider(scrapy.Spider):
                 if price:
                     return price
 
-        # Only accept an explicitly currency-marked number from nearby text.
+        # Accept text only when the number is explicitly currency-marked.
         text = self.clean_text(node.xpath("string(.)").get())
-        candidates = re.findall(r"(?:\$|ARS\s*)\s*([0-9][0-9.]*)(?:,[0-9]{1,2})?", text, flags=re.I)
-        for raw in candidates:
+        for raw in re.findall(r"(?:\$\s*|ARS\s+)([0-9][0-9.]*(?:,[0-9]{1,2})?)", text, flags=re.I):
             price = self._numeric_price(raw)
             if price:
                 return price
@@ -148,7 +145,6 @@ class VenexSpider(scrapy.Spider):
 
     def _card_from_link(self, link):
         ancestors = link.xpath("ancestor::*")
-        # Prefer the nearest ancestor that contains product-ish class tokens.
         for node in reversed(ancestors):
             cls = (node.attrib.get("class") or "").lower()
             if any(token in cls for token in ("product", "item", "card", "box")):
@@ -170,6 +166,7 @@ class VenexSpider(scrapy.Spider):
         if len(name) < 3:
             return None
 
+        # Do not trust the first generic number in a card; require a semantic price.
         price = self._find_price(node)
         if not price:
             return None
@@ -223,21 +220,27 @@ class VenexSpider(scrapy.Spider):
                 continue
             if normalized in self.seen_listings or normalized in self.seen_categories:
                 continue
-            # Only follow category-shaped links. Never follow internal tools/microsites.
             if any(x in urlparse(normalized).path.lower() for x in ("resultado-busqueda", "micrositio", "configurador")):
                 continue
             found.add(normalized)
         return found
 
+    def current_page(self, response):
+        vals = parse_qs(urlparse(response.url).query).get("page")
+        if not vals:
+            vals = parse_qs(urlparse(response.url).query).get("pagina")
+        try:
+            return max(1, int(vals[0])) if vals else int(response.meta.get("page", 1))
+        except (ValueError, TypeError):
+            return 1
+
     def parse_listing(self, response):
         products = list(self.extract_products(response))
-        new_products = 0
         for product in products:
             key = str(product.get("id_producto") or product.get("url"))
             if key in self.seen_products:
                 continue
             self.seen_products.add(key)
-            new_products += 1
             yield product
 
         current = self.current_page(response)
@@ -253,8 +256,6 @@ class VenexSpider(scrapy.Spider):
                     meta={"kind": "category", "branch": self._category_key(child), "page": 1, "discover_children": True},
                 )
 
-        # One controlled pass through category pages. Stop when the page is empty or
-        # entirely outside the product-card structure instead of crawling indefinitely.
         if not products or current >= 20:
             return
 
@@ -267,3 +268,6 @@ class VenexSpider(scrapy.Spider):
             callback=self.parse_listing,
             meta={"kind": "category", "branch": branch, "page": current + 1, "discover_children": False},
         )
+
+    def parse(self, response):
+        yield from self.parse_listing(response)
