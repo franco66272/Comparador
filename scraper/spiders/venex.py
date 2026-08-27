@@ -48,7 +48,6 @@ class VenexSpider(scrapy.Spider):
         self.seen_product_ids = set()
         self.seen_listing_urls = set()
         self.discovered_categories = set()
-        self.category_pages = {}
 
     async def start(self):
         for path in self.CATEGORY_SEEDS:
@@ -57,8 +56,7 @@ class VenexSpider(scrapy.Spider):
                 self.seen_listing_urls.add(url)
                 yield scrapy.Request(
                     url, callback=self.parse_listing,
-                    meta={"kind": "category", "branch": path, "page": 1,
-                          "discover_children": True})
+                    meta={"kind": "category", "branch": path, "page": 1, "discover_children": True})
 
         for term in self.SEARCH_TERMS:
             url = self.search_url(term, 1)
@@ -66,8 +64,7 @@ class VenexSpider(scrapy.Spider):
                 self.seen_listing_urls.add(url)
                 yield scrapy.Request(
                     url, callback=self.parse_listing,
-                    meta={"kind": "search", "branch": term, "page": 1,
-                          "discover_children": False})
+                    meta={"kind": "search", "branch": term, "page": 1, "discover_children": False})
 
     def search_url(self, term, page):
         return f"{self.SEARCH}?{urlencode({'keywords': term, 'limit': self.LIMIT, 'page': page})}"
@@ -81,13 +78,6 @@ class VenexSpider(scrapy.Spider):
             if new_path == path:
                 break
             path = new_path
-        for token in (
-            "perifericos", "componentes-de-pc", "impresion-y-scanners",
-            "pc-de-escritorio", "conectividad-y-redes", "accesorios",
-            "almacenamiento", "memorias-ram", "placas-de-video", "monitores",
-            "hogar-y-oficina",
-        ):
-            path = path.replace("/" + token + token + "/", "/" + token + "/")
         return path
 
     def listing_url(self, url, page):
@@ -110,6 +100,8 @@ class VenexSpider(scrapy.Spider):
 
     @staticmethod
     def is_product(url):
+        if not url:
+            return False
         path = urlparse(url).path.lower()
         return path.endswith(".html") or any(x in path for x in ("/producto/", "/product/", "/productos/"))
 
@@ -163,7 +155,7 @@ class VenexSpider(scrapy.Spider):
 
     def extract_products(self, response):
         selectors = (".item-prod-show .product-box", ".product-box", ".product-item",
-                     ".product-card", "article.product", "[itemtype*='Product']")
+                      ".product-card", "article.product", "[itemtype*='Product']")
         best = max((response.css(s) for s in selectors), key=len, default=[])
         for card in best:
             p = self.extract_card(card, response)
@@ -211,8 +203,7 @@ class VenexSpider(scrapy.Spider):
             return 1
 
     def _category_key(self, url):
-        path = self._clean_path(urlparse(url).path).rstrip("/").lower() or "/"
-        return path
+        return self._clean_path(urlparse(url).path).rstrip("/").lower() or "/"
 
     def discover_child_categories(self, response):
         found = set()
@@ -227,9 +218,7 @@ class VenexSpider(scrapy.Spider):
             if "resultado-busqueda" in urlparse(normalized).path.lower():
                 continue
             child_key = self._category_key(normalized)
-            if child_key == parent_key:
-                continue
-            if not child_key.startswith(parent_key.rstrip("/") + "/"):
+            if child_key == parent_key or not child_key.startswith(parent_key.rstrip("/") + "/"):
                 continue
             if not any(hint in child_key for hint in self.CATEGORY_HINTS):
                 continue
@@ -241,13 +230,11 @@ class VenexSpider(scrapy.Spider):
         if not products:
             products = list(self.jsonld_products(response))
 
-        new_count = 0
         for product in products:
             key = str(product.get("id_producto") or product.get("url") or "").strip()
             if not key or key in self.seen_product_ids:
                 continue
             self.seen_product_ids.add(key)
-            new_count += 1
             yield product
 
         current = self.current_page(response)
@@ -271,11 +258,12 @@ class VenexSpider(scrapy.Spider):
             return
 
         zero_streak = response.meta.get("zero_streak", 0)
-        if current > 1 and new_count == 0:
-            zero_streak += 1
-        else:
-            zero_streak = 0
-        if zero_streak >= 1:
+        # A full page is enough to justify continuing; an empty page stops.
+        # With global deduplication, do not stop just because all products were seen elsewhere.
+        if current > 1 and len(products) < 3:
+            return
+
+        if current > 1 and len(products) == 0:
             return
 
         next_url = self.listing_url(response.url, current + 1)
@@ -284,8 +272,8 @@ class VenexSpider(scrapy.Spider):
         self.seen_listing_urls.add(next_url)
         yield scrapy.Request(
             next_url, callback=self.parse_listing,
-            meta={**response.meta, "page": current + 1,
-                  "zero_streak": zero_streak, "discover_children": False})
+            meta={**response.meta, "page": current + 1, "zero_streak": zero_streak,
+                  "discover_children": False})
 
     def parse(self, response):
         yield from self.parse_listing(response)
