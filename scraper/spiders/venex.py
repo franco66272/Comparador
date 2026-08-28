@@ -39,11 +39,7 @@ class VenexSpider(scrapy.Spider):
             if url in self.seen_listings:
                 continue
             self.seen_listings.add(url)
-            yield scrapy.Request(
-                url,
-                callback=self.parse_listing,
-                meta={"kind": "category", "branch": self._category_key(url), "page": 1, "discover_children": True},
-            )
+            yield scrapy.Request(url, callback=self.parse_listing, meta={"page": 1, "discover_children": True})
 
     @staticmethod
     def clean_text(value):
@@ -59,17 +55,14 @@ class VenexSpider(scrapy.Spider):
     @staticmethod
     def is_product(url):
         path = urlparse(url).path.lower()
-        return path.endswith(".html") and not path.endswith(("micrositio.html", "configurador-de-pc.html"))
+        blocked = ("micrositio.html", "configurador-de-pc.html")
+        return path.endswith(".html") and not path.endswith(blocked)
 
     @staticmethod
     def _clean_path(path):
         path = path or "/"
         path = re.sub(r"/{2,}", "/", path)
-        known = (
-            "perifericos", "componentes-de-pc", "impresion-y-scanners", "pc-de-escritorio",
-            "conectividad-y-redes", "accesorios", "almacenamiento", "memorias-ram",
-            "placas-de-video", "monitores", "hogar-y-oficina",
-        )
+        known = ("perifericos", "componentes-de-pc", "impresion-y-scanners", "pc-de-escritorio", "conectividad-y-redes", "accesorios", "almacenamiento", "memorias-ram", "placas-de-video", "monitores", "hogar-y-oficina")
         for token in known:
             path = path.replace(f"/{token}{token}/", f"/{token}/")
         for _ in range(8):
@@ -85,8 +78,7 @@ class VenexSpider(scrapy.Spider):
         q.pop("pagina", None)
         q["limit"] = str(self.LIMIT)
         q["page"] = str(page)
-        path = self._clean_path(p.path)
-        return urlunparse((p.scheme or "https", p.netloc or "www.venex.com.ar", path, p.params, urlencode(q), p.fragment))
+        return urlunparse((p.scheme or "https", p.netloc or "www.venex.com.ar", self._clean_path(p.path), p.params, urlencode(q), p.fragment))
 
     def _category_key(self, url):
         return self._clean_path(urlparse(url).path).rstrip("/").lower() or "/"
@@ -112,6 +104,7 @@ class VenexSpider(scrapy.Spider):
         return n if n >= 1000 else None
 
     def _find_price(self, node):
+        # Only inspect elements explicitly associated with a price.
         selectors = [
             "[itemprop='price']::attr(content)",
             "[itemprop='price']::text",
@@ -123,35 +116,30 @@ class VenexSpider(scrapy.Spider):
         ]
         for selector in selectors:
             for raw in node.css(selector).getall():
-                price = self._numeric_price(raw)
-                if price:
-                    return price
-
-        # Accept text only when the number is explicitly currency-marked.
-        text = self.clean_text(node.xpath("string(.)").get())
-        for raw in re.findall(r"(?:\$\s*|ARS\s+)([0-9][0-9.]*(?:,[0-9]{1,2})?)", text, flags=re.I):
-            price = self._numeric_price(raw)
-            if price:
-                return price
+                p = self._numeric_price(raw)
+                if p:
+                    return p
         return None
 
     def _find_old_price(self, node):
         for selector in (".product-box-old-price::text", ".old-price::text", ".price-old::text", ".was-price::text"):
             for raw in node.css(selector).getall():
-                price = self._numeric_price(raw)
-                if price:
-                    return price
+                p = self._numeric_price(raw)
+                if p:
+                    return p
         return None
 
     def _card_from_link(self, link):
         ancestors = link.xpath("ancestor::*")
-        for node in reversed(ancestors):
+        # The nearest matching product container is the first ancestor in DOM order
+        # when walking from the link outward.
+        for node in ancestors:
             cls = (node.attrib.get("class") or "").lower()
             if any(token in cls for token in ("product", "item", "card", "box")):
                 text = self.clean_text(node.xpath("string(.)").get())
                 if text and len(text) <= 2500:
                     return node
-        return ancestors[-3] if len(ancestors) >= 3 else link
+        return ancestors[0] if ancestors else link
 
     def _extract_product(self, link, response):
         href = link.attrib.get("href")
@@ -160,43 +148,26 @@ class VenexSpider(scrapy.Spider):
         url = response.urljoin(href).split("#", 1)[0]
         if not self.same_store(url) or not self.is_product(url):
             return None
-
         node = self._card_from_link(link)
         name = self.clean_text(link.attrib.get("title") or link.attrib.get("aria-label") or link.xpath("string(.)").get())
         if len(name) < 3:
             return None
-
-        # Do not trust the first generic number in a card; require a semantic price.
         price = self._find_price(node)
         if not price:
             return None
         old_price = self._find_old_price(node)
-
         image = None
         img = node.css("img")[:1]
         if img:
-            src = (img.attrib.get("data-zoom-image") or img.attrib.get("data-large-image") or
-                   img.attrib.get("data-original") or img.attrib.get("data-lazy-src") or
-                   img.attrib.get("data-src") or img.attrib.get("src"))
+            src = (img.attrib.get("data-zoom-image") or img.attrib.get("data-large-image") or img.attrib.get("data-original") or img.attrib.get("data-lazy-src") or img.attrib.get("data-src") or img.attrib.get("src"))
             if src:
                 image = response.urljoin(src)
-
         product_id = None
         for attr in ("data-id", "data-product-id", "data-sku"):
             product_id = link.attrib.get(attr) or node.attrib.get(attr)
             if product_id:
                 break
-
-        return {
-            "tienda": "Venex",
-            "nombre": name,
-            "precio": price,
-            "precio_anterior": old_price,
-            "stock": 1,
-            "imagen": image,
-            "url": url,
-            "id_producto": str(product_id or url),
-        }
+        return {"tienda": "Venex", "nombre": name, "precio": price, "precio_anterior": old_price, "stock": 1, "imagen": image, "url": url, "id_producto": str(product_id or url)}
 
     def extract_products(self, response):
         local = set()
@@ -226,12 +197,13 @@ class VenexSpider(scrapy.Spider):
         return found
 
     def current_page(self, response):
-        vals = parse_qs(urlparse(response.url).query).get("page")
-        if not vals:
-            vals = parse_qs(urlparse(response.url).query).get("pagina")
         try:
-            return max(1, int(vals[0])) if vals else int(response.meta.get("page", 1))
-        except (ValueError, TypeError):
+            return max(1, int(response.meta.get("page", 1)))
+        except (TypeError, ValueError):
+            pass
+        try:
+            return max(1, int(parse_qs(urlparse(response.url).query).get("page", [1])[-1]))
+        except (TypeError, ValueError):
             return 1
 
     def parse_listing(self, response):
@@ -244,17 +216,11 @@ class VenexSpider(scrapy.Spider):
             yield product
 
         current = self.current_page(response)
-        branch = response.meta.get("branch") or self._category_key(response.url)
-
         if response.meta.get("discover_children") and current == 1:
             for child in self.discover_child_categories(response):
                 self.seen_categories.add(child)
                 self.seen_listings.add(child)
-                yield scrapy.Request(
-                    child,
-                    callback=self.parse_listing,
-                    meta={"kind": "category", "branch": self._category_key(child), "page": 1, "discover_children": True},
-                )
+                yield scrapy.Request(child, callback=self.parse_listing, meta={"page": 1, "discover_children": True})
 
         if not products or current >= 20:
             return
@@ -263,11 +229,7 @@ class VenexSpider(scrapy.Spider):
         if next_url in self.seen_listings:
             return
         self.seen_listings.add(next_url)
-        yield scrapy.Request(
-            next_url,
-            callback=self.parse_listing,
-            meta={"kind": "category", "branch": branch, "page": current + 1, "discover_children": False},
-        )
+        yield scrapy.Request(next_url, callback=self.parse_listing, meta={"page": current + 1, "discover_children": False})
 
     def parse(self, response):
         yield from self.parse_listing(response)
