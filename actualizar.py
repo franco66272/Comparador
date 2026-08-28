@@ -1,9 +1,8 @@
 """
 Motor central del comparador de precios.
 
-Ejecuta todas las tiendas, valida cada resultado y genera productos.json.
-Los extractores automáticos ahora devuelven métricas de descubrimiento y
-cobertura; una extracción parcial nunca reemplaza un catálogo sano.
+Ejecuta tiendas, valida resultados y genera productos.json. Los extractores
+parciales no reemplazan catálogos sanos.
 """
 import json
 import subprocess
@@ -19,26 +18,41 @@ from validacion.validar import validar_resultado
 RAIZ = Path(__file__).parent
 SPIDERS_SCRAPY = ["compragamer", "mexx", "venex", "puertominero"]
 AUTO_TIMEOUT = 420
+SCRAPY_TIMEOUT = 1800
 AUTO_LOG_DIR = RAIZ / "logs_auto"
+SCRAPY_DIR = RAIZ / "scraper"
 
 
 def correr_spider_scrapy(nombre):
     salida_tmp = RAIZ / f"{nombre}_tmp.json"
-    if salida_tmp.exists(): salida_tmp.unlink()
-    cmd = [sys.executable, "-m", "scrapy", "crawl", nombre, "-o", str(salida_tmp)]
+    if salida_tmp.exists():
+        salida_tmp.unlink()
+    cmd = [sys.executable, "-m", "scrapy", "crawl", nombre, "-O", str(salida_tmp)]
     try:
-        proc = subprocess.run(cmd, cwd=RAIZ, capture_output=True, text=True, timeout=240)
+        proc = subprocess.run(
+            cmd,
+            cwd=SCRAPY_DIR,
+            capture_output=True,
+            text=True,
+            timeout=SCRAPY_TIMEOUT,
+        )
     except subprocess.TimeoutExpired:
-        return {"ok": False, "tienda": nombre, "productos": [], "warnings": ["Timeout ejecutando spider"]}
+        return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Timeout ejecutando spider ({SCRAPY_TIMEOUT}s)"]}
     except FileNotFoundError:
         return {"ok": False, "tienda": nombre, "productos": [], "warnings": ["Comando 'scrapy' no encontrado"]}
     if proc.returncode != 0 or not salida_tmp.exists():
-        error = proc.stderr[-500:] if proc.stderr else "sin detalle"
+        error = proc.stderr[-1000:] if proc.stderr else "sin detalle"
         return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Spider falló (exit {proc.returncode}): {error}"]}
-    try: productos = json.loads(salida_tmp.read_text(encoding="utf-8"))
-    except Exception: productos = []
+    try:
+        productos = json.loads(salida_tmp.read_text(encoding="utf-8"))
+    except Exception as exc:
+        productos = []
+        parse_warning = f"JSON del spider inválido: {exc}"
+    else:
+        parse_warning = None
     salida_tmp.unlink(missing_ok=True)
-    return {"ok": bool(productos), "tienda": nombre, "productos": productos, "warnings": []}
+    warnings = [parse_warning] if parse_warning else []
+    return {"ok": bool(productos), "tienda": nombre, "productos": productos, "warnings": warnings}
 
 
 def correr_extractor_auto(extractor, nombre):
@@ -56,9 +70,12 @@ def correr_extractor_auto(extractor, nombre):
         return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"No se pudo ejecutar: {exc}"]}
     if not salida_tmp.exists():
         return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Extractor terminó sin resultado (exit {proc.returncode})."]}
-    try: resultado = json.loads(salida_tmp.read_text(encoding="utf-8"))
-    except Exception as exc: resultado = {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Resultado inválido: {exc}"]}
-    finally: salida_tmp.unlink(missing_ok=True)
+    try:
+        resultado = json.loads(salida_tmp.read_text(encoding="utf-8"))
+    except Exception as exc:
+        resultado = {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Resultado inválido: {exc}"]}
+    finally:
+        salida_tmp.unlink(missing_ok=True)
     resultado.setdefault("warnings", [])
     resultado["warnings"].append(f"Log detallado: logs_auto/{nombre}.log")
     return resultado
@@ -73,15 +90,14 @@ def procesar_tienda(nombre_archivo, resultado, reportes, resultados):
 
 
 def actualizar_historial(todos):
-    """Registra automáticamente cada precio observado sin depender de abrir el producto."""
     path = RAIZ / "historial_precios.json"
     try:
         historial = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     except Exception:
         historial = {}
 
-    def clave(p):
-        estable = str(p.get("id_producto") or p.get("url") or "").strip() or f"{p.get('tienda','')}|{p.get('nombre','')}"
+    def clave(producto):
+        estable = str(producto.get("id_producto") or producto.get("url") or "").strip() or f"{producto.get('tienda','')}|{producto.get('nombre','')}"
         import hashlib
         return hashlib.sha256(estable.encode("utf-8")).hexdigest()[:20]
 
@@ -94,12 +110,7 @@ def actualizar_historial(todos):
         key = clave(producto)
         serie = historial.setdefault(key, [])
         if not serie or int(serie[-1].get("precio", 0)) != int(precio):
-            serie.append({
-                "fecha": ahora,
-                "precio": int(precio),
-                "stock": producto.get("stock"),
-                "fuente": "actualización_automática",
-            })
+            serie.append({"fecha": ahora, "precio": int(precio), "stock": producto.get("stock"), "fuente": "actualización_automática"})
             historial[key] = serie[-180:]
             cambios += 1
     path.write_text(json.dumps(historial, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -124,14 +135,18 @@ def main():
 
     registro_path = RAIZ / "config" / "tiendas_auto.json"
     if registro_path.exists():
-        try: tiendas_auto = json.loads(registro_path.read_text(encoding="utf-8"))
+        try:
+            tiendas_auto = json.loads(registro_path.read_text(encoding="utf-8"))
         except Exception as exc:
-            print(f"[AUTO] No se pudo leer el registro: {exc}"); tiendas_auto = {}
+            print(f"[AUTO] No se pudo leer el registro: {exc}")
+            tiendas_auto = {}
         pendientes = []
         for nombre, config in tiendas_auto.items():
-            if config.get("estado") != "activo" or nombre in resultados: continue
+            if config.get("estado") != "activo" or nombre in resultados:
+                continue
             extractor = config.get("extractor")
-            if extractor: pendientes.append((nombre, extractor))
+            if extractor:
+                pendientes.append((nombre, extractor))
         workers = min(8, max(1, len(pendientes)))
         futuros = {}
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -140,8 +155,10 @@ def main():
                 futuros[pool.submit(correr_extractor_auto, extractor, nombre)] = nombre
             for futuro in as_completed(futuros):
                 nombre = futuros[futuro]
-                try: resultado_auto = futuro.result()
-                except Exception as exc: resultado_auto = {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Error: {exc}"]}
+                try:
+                    resultado_auto = futuro.result()
+                except Exception as exc:
+                    resultado_auto = {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Error: {exc}"]}
                 print(f"[auto:{nombre}] {len(resultado_auto.get('productos', []))} productos | cobertura={resultado_auto.get('coverage', 'n/a')}")
                 procesar_tienda(nombre, resultado_auto, reportes, resultados)
 
@@ -167,9 +184,11 @@ def main():
     health_path.write_text(json.dumps(salud, ensure_ascii=False, indent=2), encoding="utf-8")
 
     todos = []
-    for lista in resultados.values(): todos.extend(lista)
+    for lista in resultados.values():
+        todos.extend(lista)
     marca_actualizacion = time.strftime("%Y-%m-%dT%H:%M:%S")
-    for producto in todos: producto["actualizado_en"] = marca_actualizacion
+    for producto in todos:
+        producto["actualizado_en"] = marca_actualizacion
     (RAIZ / "productos.json").write_text(json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
 
     cambios_historial = actualizar_historial(todos)
@@ -182,10 +201,12 @@ def main():
         cobertura = r.get("coverage")
         cobertura_txt = f" | cobertura={cobertura:.1%}" if isinstance(cobertura, (int, float)) else ""
         print(f"[{r.get('salud', 'UNKNOWN')}] {r['tienda']}: {r.get('productos', 0)} productos | +{r.get('productos_nuevos', 0)} | ~{r.get('productos_actualizados', 0)} | -{r.get('productos_eliminados', 0)}{cobertura_txt}")
-        for warning in r.get("warnings", []): print(f"    WARNING: {warning}")
+        for warning in r.get("warnings", []):
+            print(f"    WARNING: {warning}")
     print("-" * 60)
     print(f"TOTAL: {len(todos)} productos -> productos.json")
     print(f"CAMBIOS DE HISTORIAL: {cambios_historial}")
 
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main()
