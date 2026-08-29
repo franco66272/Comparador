@@ -6,7 +6,7 @@ import scrapy
 
 
 class VenexHardGamersSpider(scrapy.Spider):
-    name = "venex"
+    name = "venex_hardgamers"
     allowed_domains = ["hardgamers.com.ar", "www.hardgamers.com.ar"]
 
     HG_BASE = "https://www.hardgamers.com.ar"
@@ -71,13 +71,6 @@ class VenexHardGamersSpider(scrapy.Spider):
         return n if n >= 1000 else None
 
     def extract_product_objects(self, text):
-        """Extract embedded product objects without depending on HTML classes.
-
-        HardGamers embeds the Venex records as JSON in the document. We locate
-        the distinctive storeName field and use JSONDecoder.raw_decode from the
-        nearest object boundary. This handles both server-rendered HTML and the
-        current embedded application state.
-        """
         found = []
         marker = '"storeName":"Venex"'
         start = 0
@@ -95,9 +88,8 @@ class VenexHardGamersSpider(scrapy.Spider):
                 except Exception:
                     pass
             start = pos + len(marker)
-        # Also support a direct highlightedProducts/docs array if it is valid JSON.
         for key in ("highlightedProducts", "docs"):
-            marker2 = f'"{key}":['
+            marker2 = f'"{key":['
             pos = text.find(marker2)
             if pos >= 0:
                 try:
@@ -136,14 +128,10 @@ class VenexHardGamersSpider(scrapy.Spider):
                 image = "https://www.venex.com.ar/" + image.lstrip("/")
         available = bool(doc.get("availability", True)) and bool(doc.get("active", True))
         return {
-            "tienda": "Venex",
-            "nombre": name,
-            "precio": price,
+            "tienda": "Venex", "nombre": name, "precio": price,
             "precio_anterior": self.num(doc.get("previousPrice")),
-            "stock": 1 if available else 0,
-            "imagen": image,
-            "url": clean_url,
-            "id_producto": str(doc.get("_id") or doc.get("id") or clean_url),
+            "stock": 1 if available else 0, "imagen": image,
+            "url": clean_url, "id_producto": str(doc.get("_id") or doc.get("id") or clean_url),
         }
 
     def parse_hg(self, response):
@@ -163,21 +151,14 @@ class VenexHardGamersSpider(scrapy.Spider):
             self.seen_products.add(key)
             new_count += 1
             yield product
-
         text = self.clean(response.text)
         if self.expected_total is None:
-            for pattern in (
-                r'"(?:total|count|numFound)"\s*:\s*([0-9]+)',
-                r"([0-9][0-9.]*)\s+resultados",
-                r"de\s+([0-9][0-9.]*)",
-            ):
+            for pattern in (r'"(?:total|count|numFound)"\s*:\s*([0-9]+)', r"([0-9][0-9.]*)\s+resultados"):
                 m = re.search(pattern, text, re.I)
                 if m:
                     self.expected_total = int(re.sub(r"\D", "", m.group(1)))
                     break
-
         self.logger.info("VENEX via HARDGAMERS page=%d source=%d new=%d total=%d expected=%s", page, len(docs), new_count, len(self.seen_products), self.expected_total)
-
         if not docs or new_count == 0 or len(docs) < self.PAGE_SIZE or page >= self.MAX_PAGES:
             return
         next_url = self.hg_url(page + 1)
