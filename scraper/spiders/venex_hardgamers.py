@@ -1,3 +1,4 @@
+import html
 import json
 import re
 from urllib.parse import urlencode, urlparse, urlunparse
@@ -11,16 +12,13 @@ class VenexHardGamersSpider(scrapy.Spider):
 
     HG_BASE = "https://www.hardgamers.com.ar"
     HG_STORE = "/stores/venex"
-
-    # HardGamers currently serves 24 products per page for this store.
-    # Do not assume that the requested limit is actually honored by the site.
     PAGE_SIZE = 24
     MAX_PAGES = 200
 
     custom_settings = {
         "ROBOTSTXT_OBEY": False,
         "CONCURRENT_REQUESTS_PER_DOMAIN": 2,
-        "DOWNLOAD_DELAY": 0.15,
+        "DOWNLOAD_DELAY": 0.10,
         "DOWNLOAD_TIMEOUT": 30,
         "RETRY_TIMES": 2,
         "LOG_LEVEL": "INFO",
@@ -28,6 +26,7 @@ class VenexHardGamersSpider(scrapy.Spider):
         "AUTOTHROTTLE_START_DELAY": 0.2,
         "AUTOTHROTTLE_MAX_DELAY": 5.0,
         "AUTOTHROTTLE_TARGET_CONCURRENCY": 1.5,
+        "CLOSESPIDER_ERRORCOUNT": 10,
     }
 
     def __init__(self, *args, **kwargs):
@@ -40,6 +39,7 @@ class VenexHardGamersSpider(scrapy.Spider):
         self.raw_products = set()
         self.expected_total = None
         self.expected_pages = None
+        self.parse_failures = []
 
     def hg_url(self, page):
         query = {
@@ -52,7 +52,6 @@ class VenexHardGamersSpider(scrapy.Spider):
         return f"{self.HG_BASE}{self.HG_STORE}?{urlencode(query)}"
 
     async def start(self):
-        # Scrapy 2.18+ uses the async start hook.
         url = self.hg_url(1)
         self.seen_pages.add(url)
         yield scrapy.Request(
@@ -61,18 +60,6 @@ class VenexHardGamersSpider(scrapy.Spider):
             errback=self.errback_page,
             meta={"page": 1},
         )
-
-    def start_requests(self):
-        # Compatibility with older Scrapy releases.
-        url = self.hg_url(1)
-        if url not in self.seen_pages:
-            self.seen_pages.add(url)
-            yield scrapy.Request(
-                url,
-                callback=self.parse_hg,
-                errback=self.errback_page,
-                meta={"page": 1},
-            )
 
     @staticmethod
     def clean(value):
@@ -98,54 +85,112 @@ class VenexHardGamersSpider(scrapy.Spider):
             return None
         return n if n >= 1000 else None
 
-    def extract_catalog(self, text):
-        """Extract HardGamers' actual docs array and pagination metadata.
+    def _walk_json(self, value, docs):
+        if isinstance(value, dict):
+            if self._looks_like_product(value):
+                docs.append(value)
+            for child in value.values():
+                if isinstance(child, (dict, list)):
+                    self._walk_json(child, docs)
+        elif isinstance(value, list):
+            for child in value:
+                self._walk_json(child, docs)
 
-        The previous implementation searched for storeName=Venex and therefore
-        only captured the subset of documents that happened to contain that
-        field. HardGamers exposes the complete result set in the top-level
-        `docs` array, so that array is now the authoritative source.
-        """
+    @staticmethod
+    def _looks_like_product(obj):
+        if not isinstance(obj, dict):
+            return False
+        link = obj.get("link") or obj.get("url")
+        name = obj.get("name")
+        price = obj.get("price")
+        return isinstance(link, str) and "venex.com.ar/" in link and bool(name) and price is not None
+
+    def _decode_json_candidates(self, text):
+        candidates = [text]
+        unescaped = html.unescape(text)
+        if unescaped != text:
+            candidates.append(unescaped)
+        if "\\\"" in text:
+            candidates.append(text.replace('\\"', '"'))
+
+        # Extract any plausible top-level JSON object from script/embedded data.
         decoder = json.JSONDecoder()
+        for candidate in candidates:
+            starts = [m.start() for m in re.finditer(r"\{", candidate)]
+            for pos in starts[:300]:
+                try:
+                    obj, end = decoder.raw_decode(candidate[pos:])
+                except Exception:
+                    continue
+                if isinstance(obj, dict) and any(k in obj for k in ("docs", "total", "pages", "paginate")):
+                    yield obj
+
+    def extract_catalog(self, text):
         docs = []
         total = None
         pages = None
+        seen_payload_ids = set()
 
-        # Find the docs property without assuming exact whitespace.
-        docs_match = re.search(r'"docs"\s*:\s*\[', text)
-        if docs_match:
-            array_start = text.find("[", docs_match.start())
-            try:
-                docs, end_pos = decoder.raw_decode(text[array_start:])
-                if not isinstance(docs, list):
-                    docs = []
-                tail = text[array_start + end_pos:]
+        for root in self._decode_json_candidates(text):
+            payloads = [root]
+            while payloads:
+                obj = payloads.pop()
+                if not isinstance(obj, dict):
+                    continue
+                marker = id(obj)
+                if marker in seen_payload_ids:
+                    continue
+                seen_payload_ids.add(marker)
 
-                # These fields are in the same HardGamers JSON payload as docs.
-                m = re.search(r'"total"\s*:\s*(\d+)', tail)
-                if m:
-                    total = int(m.group(1))
+                if isinstance(obj.get("docs"), list):
+                    docs.extend(x for x in obj["docs"] if isinstance(x, dict))
+                if total is None and isinstance(obj.get("total"), (int, float)):
+                    total = int(obj["total"])
+                if pages is None and isinstance(obj.get("pages"), int):
+                    pages = int(obj["pages"])
+                paginate = obj.get("paginate")
+                if pages is None and isinstance(paginate, dict):
+                    page_entries = paginate.get("pages")
+                    if isinstance(page_entries, list):
+                        pages = len(page_entries)
 
-                m = re.search(r'"pages"\s*:\s*(\d+)', tail)
-                if m:
-                    pages = int(m.group(1))
-            except (ValueError, json.JSONDecodeError):
-                docs = []
+                for value in obj.values():
+                    if isinstance(value, dict):
+                        payloads.append(value)
+                    elif isinstance(value, list):
+                        payloads.extend(x for x in value if isinstance(x, dict))
 
-        # Fallback for a response variant where the JSON is embedded in HTML
-        # with escaped quotes. This does not replace the primary parser.
+        # Second pass over the whole text: recover individual product objects.
+        # This handles pages where the application payload is encoded in a JS blob.
         if not docs:
-            escaped = text.replace("&quot;", '"')
-            if escaped != text:
-                return self.extract_catalog(escaped)
+            decoder = json.JSONDecoder()
+            for marker in re.finditer(r'"link"\s*:\s*"https?://(?:www\.)?venex\.com\.ar/', text):
+                brace = text.rfind("{", 0, marker.start())
+                if brace < 0:
+                    continue
+                try:
+                    obj, _ = decoder.raw_decode(html.unescape(text[brace:]))
+                except Exception:
+                    continue
+                if self._looks_like_product(obj):
+                    docs.append(obj)
 
         unique = {}
         for obj in docs:
-            if not isinstance(obj, dict):
+            if not self._looks_like_product(obj):
                 continue
             pid = str(obj.get("_id") or obj.get("id") or obj.get("link") or "")
             if pid:
                 unique[pid] = obj
+
+        if total is None:
+            m = re.search(r'"total"\s*:\s*(\d+)', text)
+            if m:
+                total = int(m.group(1))
+        if pages is None:
+            m = re.search(r'"pages"\s*:\s*(\d+)', text)
+            if m:
+                pages = int(m.group(1))
 
         return list(unique.values()), total, pages
 
@@ -153,17 +198,14 @@ class VenexHardGamersSpider(scrapy.Spider):
         link = str(doc.get("link") or doc.get("url") or "").strip()
         if not link:
             return None
-
         p = urlparse(link)
         if p.netloc.lower().removeprefix("www.") != "venex.com.ar":
             return None
-
         clean_url = urlunparse(("https", "www.venex.com.ar", p.path, "", "", ""))
         name = self.clean(doc.get("name"))
         price = self.num(doc.get("price"))
         if not name or not price:
             return None
-
         image = doc.get("image")
         if isinstance(image, list):
             image = image[0] if image else None
@@ -173,9 +215,7 @@ class VenexHardGamersSpider(scrapy.Spider):
                 image = "https://www.venex.com.ar" + image
             elif not image.startswith(("http://", "https://")):
                 image = "https://www.venex.com.ar/" + image.lstrip("/")
-
         available = bool(doc.get("availability", True)) and bool(doc.get("active", True))
-
         return {
             "tienda": "Venex",
             "nombre": name,
@@ -189,11 +229,9 @@ class VenexHardGamersSpider(scrapy.Spider):
 
     def parse_hg(self, response):
         page = int(response.meta["page"])
-        self.pages_ok += 1
-
         docs, total, pages = self.extract_catalog(response.text)
+        self.pages_ok += 1
         self.source_items += len(docs)
-
         if total is not None:
             self.expected_total = total
         if pages is not None:
@@ -204,31 +242,21 @@ class VenexHardGamersSpider(scrapy.Spider):
             product = self.normalize(doc)
             if not product:
                 continue
-
             self.raw_products.add(product["url"])
             key = product["id_producto"]
             if key in self.seen_products:
                 continue
-
             self.seen_products.add(key)
             new_count += 1
             yield product
 
         self.logger.info(
             "VENEX via HARDGAMERS page=%d source=%d new=%d total=%d expected_total=%s expected_pages=%s",
-            page,
-            len(docs),
-            new_count,
-            len(self.seen_products),
-            self.expected_total,
-            self.expected_pages,
+            page, len(docs), new_count, len(self.seen_products), self.expected_total, self.expected_pages,
         )
 
-        if not docs or new_count == 0 or page >= self.MAX_PAGES:
+        if not docs or page >= self.MAX_PAGES:
             return
-
-        # Prefer the site's own pagination metadata. This is critical because
-        # the final page is naturally shorter than PAGE_SIZE.
         if self.expected_pages is not None:
             if page >= self.expected_pages:
                 return
@@ -238,14 +266,8 @@ class VenexHardGamersSpider(scrapy.Spider):
         next_url = self.hg_url(page + 1)
         if next_url in self.seen_pages:
             return
-
         self.seen_pages.add(next_url)
-        yield scrapy.Request(
-            next_url,
-            callback=self.parse_hg,
-            errback=self.errback_page,
-            meta={"page": page + 1},
-        )
+        yield scrapy.Request(next_url, callback=self.parse_hg, errback=self.errback_page, meta={"page": page + 1})
 
     def errback_page(self, failure):
         url = failure.request.url
