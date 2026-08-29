@@ -1,13 +1,12 @@
-"""Extractor automático para WIZ TECH."""
-from .auto_generico import extraer_desde_config
+"""Extractor robusto para WIZ TECH."""
+from .catalogo_robusto import extraer_desde_config_robusto
 
 CONFIG = {
     "tienda": "wiztech_com_ar",
     "url": "https://wiztech.com.ar",
-    "plataformas": ["woocommerce"],
-    "catalog_urls": ["https://wiztech.com.ar/tienda/", "https://wiztech.com.ar/shop/"],
-    "fuentes_prioritarias": [],
+    "catalog_urls": ["https://wiztech.com.ar/catalogo"],
+    "producto_regex": r"/catalogo/producto/[^?#]+",
 }
 
 def extraer():
-    return extraer_desde_config(CONFIG)
+    return extraer_desde_config_robusto(CONFIG)
