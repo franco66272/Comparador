@@ -20,13 +20,11 @@ class VenexCoreSpider(scrapy.Spider):
         "RETRY_TIMES": 3,
     }
 
-    CATEGORY_SEEDS = [
-        "/",
-    ]
-
     EXCLUDED_PATH_PARTS = (
         "resultado-busqueda", "micrositio", "configurador", "login", "cart",
-        "checkout", "mi-cuenta", "contacto", "blog", "quienes-somos",
+        "checkout", "mi-cuenta", "contacto", "quienes-somos", "oficinas",
+        "terminos", "politicas", "garantia", "promociones", "envio-express",
+        "create_account", "entrar", "recuperar", "registro",
     )
 
     def __init__(self, *args, **kwargs):
@@ -37,10 +35,19 @@ class VenexCoreSpider(scrapy.Spider):
         self.page_signatures = set()
         self.category_pages = {}
         self.category_products = {}
-        self.category_failures = {}
-        self.discovery_pages = 0
         self.product_urls_seen = set()
         self.product_urls_extracted = set()
+        self.pages_failed = 0
+
+    def start_requests(self):
+        # The previous revision accidentally removed the spider entry point.
+        # Without start_requests/start_urls Scrapy started and immediately closed
+        # without visiting Venex, which caused actualizar.py to keep the old catalog.
+        url = self.listing_url(self.BASE + "/", 1)
+        self.seen_listings.add(url)
+        yield scrapy.Request(url, callback=self.parse_listing,
+                             meta={"page": 1, "discover": True},
+                             dont_filter=True)
 
     @staticmethod
     def clean_text(value):
@@ -60,7 +67,11 @@ class VenexCoreSpider(scrapy.Spider):
 
     def _clean_path(self, path):
         path = re.sub(r"/{2,}", "/", path or "/")
-        path = re.sub(r"/([^/]+)/\1(?=/|$)", r"/\1", path, flags=re.I)
+        for _ in range(5):
+            new = re.sub(r"/([^/]+)/\1(?=/|$)", r"/\1", path, flags=re.I)
+            if new == path:
+                break
+            path = new
         return path
 
     def listing_url(self, url, page=1):
@@ -70,7 +81,8 @@ class VenexCoreSpider(scrapy.Spider):
         q.pop("page", None)
         q["limit"] = str(self.LIMIT)
         q["page"] = str(page)
-        return urlunparse((p.scheme or "https", p.netloc or "www.venex.com.ar", self._clean_path(p.path), p.params, urlencode(q), p.fragment))
+        return urlunparse((p.scheme or "https", p.netloc or "www.venex.com.ar",
+                           self._clean_path(p.path), p.params, urlencode(q), p.fragment))
 
     def category_key(self, url):
         return self._clean_path(urlparse(url).path).rstrip("/").lower() or "/"
@@ -81,11 +93,8 @@ class VenexCoreSpider(scrapy.Spider):
         if not s:
             return None
         if "," in s and "." in s:
-            left, right = s.rsplit(",", 1)
-            if right.isdigit() and len(right) <= 2:
-                s = left
-            else:
-                s = s.replace(",", "")
+            integer, decimal = s.rsplit(",", 1)
+            s = integer if len(decimal) <= 2 else s.replace(",", "")
             s = s.replace(".", "")
         elif "," in s:
             parts = s.split(",")
@@ -93,10 +102,10 @@ class VenexCoreSpider(scrapy.Spider):
         else:
             s = s.replace(".", "")
         try:
-            n = int(s)
+            value = int(s)
         except ValueError:
             return None
-        return n if n >= 1000 else None
+        return value if value >= 1000 else None
 
     def find_price(self, node):
         selectors = (
@@ -129,8 +138,7 @@ class VenexCoreSpider(scrapy.Spider):
                 ahref = anchor.attrib.get("href", "")
                 if ahref.lower().split("?", 1)[0].endswith(".html"):
                     product_hrefs.append(ahref)
-            unique = {response_url for response_url in product_hrefs}
-            if len(unique) == 1 and product_hrefs and product_hrefs[0] == href and self.find_price(node):
+            if len(set(product_hrefs)) == 1 and product_hrefs[0] == href and self.find_price(node):
                 return node
         return None
 
@@ -162,13 +170,12 @@ class VenexCoreSpider(scrapy.Spider):
                 image = response.urljoin(src)
         text = self.clean_text(card.xpath("string(.)").get()).lower()
         stock = 0 if any(term in text for term in ("sin stock", "producto sin stock", "agotado")) else 1
-        product = {
+        self.product_urls_extracted.add(url)
+        return {
             "tienda": "Venex", "nombre": name, "precio": price,
             "precio_anterior": None, "stock": stock, "imagen": image,
             "url": url, "id_producto": url,
         }
-        self.product_urls_extracted.add(url)
-        return product
 
     def structured_products(self, response):
         result = []
@@ -237,8 +244,10 @@ class VenexCoreSpider(scrapy.Spider):
             low = path.lower()
             if any(part in low for part in self.EXCLUDED_PATH_PARTS):
                 continue
-            # Category/navigation URLs generally do not use .html and live below
-            # the Venex domain. Discover recursively rather than relying on a seed list.
+            # Only crawl catalogue-like paths. This prevents the root page from
+            # turning the spider into a generic site crawler.
+            if path == "/" or "." in path.rsplit("/", 1)[-1]:
+                continue
             normalized = self.listing_url(url, 1)
             if normalized not in self.seen_listings and normalized not in self.seen_categories:
                 found.add(normalized)
@@ -254,7 +263,6 @@ class VenexCoreSpider(scrapy.Spider):
                 return 1
 
     def parse_listing(self, response):
-        self.discovery_pages += 1
         category = self.category_key(response.url)
         page = self.page_number(response)
         self.category_pages.setdefault(category, set()).add(page)
@@ -273,6 +281,7 @@ class VenexCoreSpider(scrapy.Spider):
             self.seen_products.add(key)
             yield product
 
+        # Discover subcategories recursively from every first page.
         if page == 1:
             for child in self.discover_categories(response):
                 self.seen_categories.add(child)
@@ -280,7 +289,6 @@ class VenexCoreSpider(scrapy.Spider):
                 yield scrapy.Request(child, callback=self.parse_listing,
                                      meta={"page": 1, "discover": True})
 
-        # Continue until the page is genuinely empty, repeated, or the hard safety cap.
         if repeated or not raw_urls or page >= self.MAX_PAGES_PER_CATEGORY:
             return
         next_url = self.listing_url(response.url, page + 1)
@@ -291,26 +299,16 @@ class VenexCoreSpider(scrapy.Spider):
                              meta={"page": page + 1, "discover": False})
 
     def closed(self, reason):
-        categories = len(self.seen_categories)
         pages = sum(len(v) for v in self.category_pages.values())
-        unique_products = len(self.seen_products)
-        urls_seen = len(self.product_urls_seen)
-        urls_extracted = len(self.product_urls_extracted)
         print("=" * 72)
         print("VENEX CATALOG REPORT")
         print("=" * 72)
         print(f"reason={reason}")
-        print(f"categories_discovered={categories}")
+        print(f"categories_discovered={len(self.seen_categories)}")
         print(f"listing_pages={pages}")
-        print(f"raw_product_urls={urls_seen}")
-        print(f"products_extracted={urls_extracted}")
-        print(f"products_unique={unique_products}")
-        print(f"coverage_proxy={((unique_products / urls_seen) if urls_seen else 0.0):.4f}")
-        print("category_breakdown=")
-        for category in sorted(self.category_pages):
-            page_count = len(self.category_pages[category])
-            product_count = len(self.category_products.get(category, set()))
-            print(f"  {category}: pages={page_count} products={product_count}")
+        print(f"raw_product_urls={len(self.product_urls_seen)}")
+        print(f"products_extracted={len(self.product_urls_extracted)}")
+        print(f"products_unique={len(self.seen_products)}")
         print("=" * 72)
 
     def parse(self, response):
