@@ -37,14 +37,23 @@ class VenexHardGamersSpider(scrapy.Spider):
         self.raw_products = set()
         self.expected_total = None
 
-    def start_requests(self):
+    def hg_url(self, page):
+        query = {"brand": "", "limit": str(self.PAGE_SIZE), "page": str(page), "province": "", "store": "venex"}
+        return f"{self.HG_BASE}{self.HG_STORE}?{urlencode(query)}"
+
+    async def start(self):
+        # Scrapy 2.18+ uses the async start hook. Explicitly yielding the first
+        # request prevents the spider from finishing immediately with 0 pages.
         url = self.hg_url(1)
         self.seen_pages.add(url)
         yield scrapy.Request(url, callback=self.parse_hg, errback=self.errback_page, meta={"page": 1})
 
-    def hg_url(self, page):
-        query = {"brand": "", "limit": str(self.PAGE_SIZE), "page": str(page), "province": "", "store": "venex"}
-        return f"{self.HG_BASE}{self.HG_STORE}?{urlencode(query)}"
+    def start_requests(self):
+        # Compatibility with older Scrapy releases.
+        url = self.hg_url(1)
+        if url not in self.seen_pages:
+            self.seen_pages.add(url)
+            yield scrapy.Request(url, callback=self.parse_hg, errback=self.errback_page, meta={"page": 1})
 
     @staticmethod
     def clean(value):
