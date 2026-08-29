@@ -1,3 +1,4 @@
+import asyncio
 import html
 import json
 import re
@@ -13,18 +14,21 @@ class VenexHardGamersSpider(scrapy.Spider):
     HG_STORE = "/stores/venex"
     PAGE_SIZE = 24
     MAX_PAGES = 200
+    MAX_429_RETRIES = 8
 
     custom_settings = {
         "ROBOTSTXT_OBEY": False,
-        "CONCURRENT_REQUESTS_PER_DOMAIN": 2,
-        "DOWNLOAD_DELAY": 0.1,
+        "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
+        "DOWNLOAD_DELAY": 1.5,
         "DOWNLOAD_TIMEOUT": 30,
-        "RETRY_TIMES": 2,
+        "RETRY_TIMES": 4,
+        "RETRY_HTTP_CODES": [408, 429, 500, 502, 503, 504],
         "LOG_LEVEL": "INFO",
         "AUTOTHROTTLE_ENABLED": True,
-        "AUTOTHROTTLE_START_DELAY": 0.2,
-        "AUTOTHROTTLE_MAX_DELAY": 5.0,
-        "AUTOTHROTTLE_TARGET_CONCURRENCY": 1.5,
+        "AUTOTHROTTLE_START_DELAY": 1.5,
+        "AUTOTHROTTLE_MAX_DELAY": 10.0,
+        "AUTOTHROTTLE_TARGET_CONCURRENCY": 0.5,
+        "COOKIES_ENABLED": True,
     }
 
     def __init__(self, *args, **kwargs):
@@ -45,7 +49,7 @@ class VenexHardGamersSpider(scrapy.Spider):
     async def start(self):
         url = self.hg_url(1)
         self.seen_pages.add(url)
-        yield scrapy.Request(url, callback=self.parse_hg, errback=self.errback_page, meta={"page": 1})
+        yield scrapy.Request(url, callback=self.parse_hg, errback=self.errback_page, meta={"page": 1, "retry_429": 0})
 
     @staticmethod
     def clean(value):
@@ -92,7 +96,6 @@ class VenexHardGamersSpider(scrapy.Spider):
                     self._walk(child, docs, metadata)
 
     def _decode_embedded(self, text):
-        """Decode embedded JSON objects without assuming a specific framework."""
         variants = [text, html.unescape(text), text.replace('\\"', '"')]
         seen = set()
         decoder = json.JSONDecoder()
@@ -113,7 +116,6 @@ class VenexHardGamersSpider(scrapy.Spider):
         for root in self._decode_embedded(text):
             self._walk(root, docs, metadata)
 
-        # Last-resort extraction for HTML containing escaped product links.
         if not docs:
             decoded = html.unescape(text).replace('\\"', '"')
             for match in re.finditer(r'"link"\s*:\s*"(https?://(?:www\.)?venex\.com\.ar/[^"\\]+)"', decoded, re.I):
@@ -208,11 +210,34 @@ class VenexHardGamersSpider(scrapy.Spider):
         if next_url in self.seen_pages:
             return
         self.seen_pages.add(next_url)
-        yield scrapy.Request(next_url, callback=self.parse_hg, errback=self.errback_page, meta={"page": page + 1})
+        yield scrapy.Request(next_url, callback=self.parse_hg, errback=self.errback_page, meta={"page": page + 1, "retry_429": 0})
 
-    def errback_page(self, failure):
-        self.pages_failed.append(failure.request.url)
-        self.logger.warning("VENEX via HARDGAMERS failed: %s", failure.request.url)
+    async def errback_page(self, failure):
+        request = failure.request
+        page = int(request.meta.get("page", 0))
+        response = getattr(failure.value, "response", None)
+        status = getattr(response, "status", None)
+        retries = int(request.meta.get("retry_429", 0))
+
+        if status == 429 and retries < self.MAX_429_RETRIES:
+            delay = min(60, 5 * (2 ** retries))
+            self.logger.warning("VENEX via HARDGAMERS rate limited page=%d; retry %d/%d in %ds", page, retries + 1, self.MAX_429_RETRIES, delay)
+            await asyncio.sleep(delay)
+            new_request = request.copy()
+            new_request.dont_filter = True
+            new_request.meta["retry_429"] = retries + 1
+            yield new_request
+            return
+
+        self.pages_failed.append(request.url)
+        self.logger.warning("VENEX via HARDGAMERS failed page=%d status=%s: %s", page, status, request.url)
+
+        if self.expected_pages and page < self.expected_pages:
+            next_page = page + 1
+            next_url = self.hg_url(next_page)
+            if next_url not in self.seen_pages:
+                self.seen_pages.add(next_url)
+                yield scrapy.Request(next_url, callback=self.parse_hg, errback=self.errback_page, meta={"page": next_page, "retry_429": 0})
 
     def closed(self, reason):
         coverage = (len(self.raw_products) / self.expected_total) if self.expected_total else None
