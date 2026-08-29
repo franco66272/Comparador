@@ -1,5 +1,5 @@
-from .venex_catalog import VenexCatalogSpider
+from .venex_catalog_v2 import VenexCatalogV2Spider
 
 
-class VenexSpider(VenexCatalogSpider):
+class VenexSpider(VenexCatalogV2Spider):
     name = "venex"
