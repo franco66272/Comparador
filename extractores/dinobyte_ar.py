@@ -1,13 +1,11 @@
-"""Extractor automático para Dinobyte."""
-from .auto_generico import extraer_desde_config
+"""Extractor robusto para Dinobyte."""
+from .catalogo_robusto import extraer_desde_config_robusto
 
 CONFIG = {
     "tienda": "dinobyte_ar",
     "url": "https://dinobyte.ar",
-    "plataformas": ["woocommerce"],
     "catalog_urls": ["https://dinobyte.ar/shop/", "https://dinobyte.ar/tienda/"],
-    "fuentes_prioritarias": [],
 }
 
 def extraer():
-    return extraer_desde_config(CONFIG)
+    return extraer_desde_config_robusto(CONFIG)
