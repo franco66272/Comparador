@@ -1,7 +1,8 @@
-
 import json
 import sys
+import subprocess
 from pathlib import Path
+
 
 def main():
     if len(sys.argv) != 3:
@@ -12,6 +13,11 @@ def main():
     salida = Path(sys.argv[2])
 
     try:
+        if modulo_nombre == "extractores.auto_auditoria":
+            proc = subprocess.run([sys.executable, "-m", modulo_nombre], capture_output=True, text=True)
+            salida.write_text(json.dumps({"ok": proc.returncode == 0, "tienda": "auditoria", "productos": [], "warnings": proc.stdout.splitlines()[-20:]}, ensure_ascii=False), encoding="utf-8")
+            raise SystemExit(proc.returncode)
+
         modulo = __import__(modulo_nombre, fromlist=["extraer"])
         resultado = modulo.extraer()
         if not isinstance(resultado, dict):
