@@ -1,13 +1,18 @@
-"""Extractor automático para Max Tecno."""
-from .auto_generico import extraer_desde_config
+"""Extractor robusto para Max Tecno."""
+from .catalogo_robusto import extraer_desde_config_robusto
 
 CONFIG = {
     "tienda": "maxtecno_com_ar",
     "url": "https://www.maxtecno.com.ar",
-    "plataformas": ["woocommerce"],
-    "catalog_urls": ["https://maxtecno.com.ar/hardware/", "https://maxtecno.com.ar/tienda/"],
-    "fuentes_prioritarias": [],
+    "catalog_urls": [
+        "https://maxtecno.com.ar/hardware/",
+        "https://maxtecno.com.ar/tienda/",
+        "https://maxtecno.com.ar/categoria/computadoras/",
+        "https://maxtecno.com.ar/categoria/componentes-pc/",
+        "https://maxtecno.com.ar/categoria/auriculares/",
+        "https://maxtecno.com.ar/categoria/notebooks/",
+    ],
 }
 
 def extraer():
-    return extraer_desde_config(CONFIG)
+    return extraer_desde_config_robusto(CONFIG)
