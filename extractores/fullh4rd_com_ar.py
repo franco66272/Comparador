@@ -1,8 +1,18 @@
-"""Extractor automático generado por el motor universal."""
-from .auto_generico import extraer_desde_config
+"""Extractor robusto para FullH4rd."""
+from .catalogo_robusto import extraer_desde_config_robusto
 
-CONFIG = {'tienda': 'fullh4rd_com_ar', 'url': 'https://fullh4rd.com.ar', 'plataformas': ['no_reconocida'], 'jsonld_productos': 0, 'endpoints': ['http://qr.afip.gob.ar/?\nqr=PfjISdSHR1BvEIY9oF1ZhQ,,', 'http://schema.org', 'http://www.w3.org/1999/xlink', 'http://www.w3.org/2000/svg', 'https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js', 'https://api.whatsapp.com/send?phone=5491124092324&text=Hola! Gracias por comunicarte con FullHard, a continuación informanos el número de tu pedido.', 'https://api.whatsapp.com/send?phone=5491139341696', 'https://api.whatsapp.com/send?phone=5491139341696&text=Hola! Gracias por comunicarte con el sector de VENTAS de FullH4rd, a continuación informanos sobre el artículo que deseas comprar.', 'https://api.whatsapp.com/send?phone=5491139341696&text=Hola!%20Gracias%20por%20comunicarte%20con%20el%20sector%20de%20VENTAS%20de%20FullH4rd,%20a%20continuaci%C3%B3n%20informanos%20sobre%20el%20art%C3%ADculo%20que%20deseas%20comprar.', 'https://ar.linkedin.com/company/fullh4rd', 'https://fhgamer.ar', 'https://fhgamer.ar/wp-content/uploads/2018/11/logofulltv-e1543939218354.png', 'https://forms.gle/6x38tEeWA4CbWT1q8', 'https://fullh4rd.com.ar/', 'https://fullh4rd.com.ar/amd', 'https://fullh4rd.com.ar/assets/logo_black.png', 'https://fullh4rd.com.ar/cat/search/gigabyte%20z890', 'https://fullh4rd.com.ar/img/productos/40/tablet-lenovo-127-tab-pro-8gb-256gb-3k-144hz--teclado--lapiz--auris-android-0.jpg', 'https://fullh4rd.com.ar/kingston', 'https://fullh4rd.com.ar/kingston-corporativo'], 'catalog_urls': ['https://fullh4rd.com.ar/productos', 'https://fullh4rd.com.ar/pcarmada', 'https://fullh4rd.com.ar/nvidia', 'https://fullh4rd.com.ar/cat/supra/3/placas-de-video/1', 'https://fullh4rd.com.ar/cat', 'https://fullh4rd.com.ar/hyperx', 'https://fullh4rd.com.ar/amd', 'https://fullh4rd.com.ar/armatupc', 'https://fullh4rd.com.ar/pcarmada/gamer', 'https://fullh4rd.com.ar/cat/132/externos', 'https://fullh4rd.com.ar/cat/19/discos-sata', 'https://fullh4rd.com.ar/cat/124/nvidia', 'https://fullh4rd.com.ar/cat/185/discos-estado-solido', 'https://fullh4rd.com.ar/cat/115/ati-amd', 'https://fullh4rd.com.ar/cat/46/monitores-gamer', 'https://fullh4rd.com.ar/cat/62/monitores-led', 'https://fullh4rd.com.ar/cat/64/fuentes', 'https://fullh4rd.com.ar/cat/230/sillas-gamer', 'https://fullh4rd.com.ar/cat/198/mb-amd-am4', 'https://fullh4rd.com.ar/cat/199/mb-amd-fm2', 'https://fullh4rd.com.ar/cat/201/mb-intel-1151/1', 'https://fullh4rd.com.ar/cat/282/mb-amd-cpu', 'https://fullh4rd.com.ar/cat/192/amd-am4', 'https://fullh4rd.com.ar/cat/193/amd-fm2', 'https://fullh4rd.com.ar/cat/195/intel-1151', 'https://fullh4rd.com.ar/cat/10/gabinetes-kit', 'https://fullh4rd.com.ar/cat/65/gabinetes-sin-fuente', 'https://fullh4rd.com.ar/cat/137/gabinetes-c-fuente-650w/1', 'https://fullh4rd.com.ar/cat/45/mouse-gamer', 'https://fullh4rd.com.ar/cat/26/mouse-optico-usb', 'https://fullh4rd.com.ar/cat/73/mouse-inalambrico/1', 'https://fullh4rd.com.ar/cat/209/memoria-sodim-ddr4', 'https://fullh4rd.com.ar/cat/276/memoria-dim-ddr3-1333mhz', 'https://fullh4rd.com.ar/cat/208/memoria-sodim-ddr3', 'https://fullh4rd.com.ar/cat/273/memoria-dim-ddr4-3600-mhz', 'https://fullh4rd.com.ar/cat/search/video', 'https://fullh4rd.com.ar/tag/lg', 'https://fullh4rd.com.ar/tag/kingston', 'https://fullh4rd.com.ar/tag/nvidia', 'https://fullh4rd.com.ar/tag/placa%20de%20video', 'https://fullh4rd.com.ar/tag/asus', 'https://fullh4rd.com.ar/tag/msi', 'https://fullh4rd.com.ar/tag/wd', 'https://fullh4rd.com.ar/tag/geforce', 'https://fullh4rd.com.ar/tag/radeon', 'https://fullh4rd.com.ar/tag/logitech', 'https://fullh4rd.com.ar/tag/webcam', 'https://fullh4rd.com.ar/tag/dvd', 'https://fullh4rd.com.ar/tag/teclado', 'https://fullh4rd.com.ar/tag/mouse'], 'fuentes_prioritarias': [], 'estructura_detectada': {'productos_iniciales': 0, 'con_imagen': 0, 'con_precio': 0, 'con_url': 0}}
-
+CONFIG = {
+    "tienda": "fullh4rd_com_ar",
+    "url": "https://fullh4rd.com.ar",
+    "catalog_urls": [
+        "https://fullh4rd.com.ar/productos",
+        "https://fullh4rd.com.ar/cat",
+        "https://fullh4rd.com.ar/amd",
+        "https://fullh4rd.com.ar/nvidia",
+        "https://fullh4rd.com.ar/pcarmada",
+    ],
+    "producto_regex": r"/prod/\d+/[^?#]+",
+}
 
 def extraer():
-    return extraer_desde_config(CONFIG)
+    return extraer_desde_config_robusto(CONFIG)
