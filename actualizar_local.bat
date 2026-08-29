@@ -2,6 +2,8 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 
+if /i "%~1"=="auditar" goto :audit
+
 set "STATUS_FILE=%TEMP%\compararadar_git_status.txt"
 set "HAS_CHANGES="
 
@@ -38,7 +40,6 @@ if errorlevel 1 goto :error
 
 git clean -fd
 if errorlevel 1 goto :error
-
 echo Codigo local sincronizado con origin/main.
 
 echo.
@@ -46,13 +47,6 @@ echo [3/5] Instalando dependencias...
 py -m pip install -r requirements.txt
 if errorlevel 1 goto :pip_error
 
-goto :run_catalog
-
-:pip_error
-echo ERROR: No se pudieron instalar las dependencias.
-goto :error
-
-:run_catalog
 echo.
 echo [4/5] Ejecutando actualizacion completa del catalogo...
 py actualizar.py
@@ -62,16 +56,27 @@ echo.
 echo [5/5] Verificacion final...
 if not exist "productos.json" goto :catalog_missing
 if not exist "config\salud_tiendas.json" goto :health_missing
-
 for %%F in (productos.json) do echo Catalogo generado: %%~zF bytes
 
 echo.
 echo ================================================
 echo ACTUALIZACION COMPLETADA
- echo ================================================
+echo ================================================
 echo.
 echo El catalogo fue actualizado y validado.
 exit /b 0
+
+:audit
+echo ================================================
+echo Compararadar - auditoria de tiendas
+ echo ================================================
+echo.
+py -m extractores.auto_auditoria
+exit /b %errorlevel%
+
+:pip_error
+echo ERROR: No se pudieron instalar las dependencias.
+goto :error
 
 :not_git
 echo ERROR: esta carpeta no es un repositorio Git.
@@ -89,6 +94,6 @@ goto :error
 echo.
 echo ================================================
 echo ERROR EN LA ACTUALIZACION
- echo ================================================
+echo ================================================
 echo Revisa el mensaje anterior.
 exit /b 1
