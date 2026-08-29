@@ -89,7 +89,7 @@ class VenexHardGamersSpider(scrapy.Spider):
                     pass
             start = pos + len(marker)
         for key in ("highlightedProducts", "docs"):
-            marker2 = f'"{key":['
+            marker2 = f'"{key}":['
             pos = text.find(marker2)
             if pos >= 0:
                 try:
