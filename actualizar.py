@@ -18,40 +18,41 @@ from validacion.validar import validar_resultado
 RAIZ = Path(__file__).parent
 SPIDERS_SCRAPY = ["compragamer", "mexx", "venex", "puertominero"]
 AUTO_TIMEOUT = 420
-SCRAPY_TIMEOUT = 1800
+SCRAPY_TIMEOUT = 3600
 AUTO_LOG_DIR = RAIZ / "logs_auto"
 SCRAPY_DIR = RAIZ / "scraper"
 
 
 def correr_spider_scrapy(nombre):
     salida_tmp = RAIZ / f"{nombre}_tmp.json"
-    if salida_tmp.exists():
-        salida_tmp.unlink()
+    log_path = AUTO_LOG_DIR / f"{nombre}_scrapy.log"
+    AUTO_LOG_DIR.mkdir(exist_ok=True)
+    salida_tmp.unlink(missing_ok=True)
     cmd = [sys.executable, "-m", "scrapy", "crawl", nombre, "-O", str(salida_tmp)]
     try:
-        proc = subprocess.run(
-            cmd,
-            cwd=SCRAPY_DIR,
-            capture_output=True,
-            text=True,
-            timeout=SCRAPY_TIMEOUT,
-        )
+        with open(log_path, "w", encoding="utf-8") as log:
+            proc = subprocess.run(
+                cmd,
+                cwd=SCRAPY_DIR,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=SCRAPY_TIMEOUT,
+            )
     except subprocess.TimeoutExpired:
-        return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Timeout ejecutando spider ({SCRAPY_TIMEOUT}s)"]}
+        return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Timeout ejecutando spider ({SCRAPY_TIMEOUT}s). Log: logs_auto/{nombre}_scrapy.log"]}
     except FileNotFoundError:
-        return {"ok": False, "tienda": nombre, "productos": [], "warnings": ["Comando 'scrapy' no encontrado"]}
+        return {"ok": False, "tienda": nombre, "productos": [], "warnings": ["Comando Scrapy no encontrado"]}
     if proc.returncode != 0 or not salida_tmp.exists():
-        error = proc.stderr[-1000:] if proc.stderr else "sin detalle"
-        return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Spider falló (exit {proc.returncode}): {error}"]}
+        return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Spider falló (exit {proc.returncode}). Log: logs_auto/{nombre}_scrapy.log"]}
     try:
         productos = json.loads(salida_tmp.read_text(encoding="utf-8"))
     except Exception as exc:
         productos = []
-        parse_warning = f"JSON del spider inválido: {exc}"
+        warnings = [f"JSON del spider inválido: {exc}", f"Log: logs_auto/{nombre}_scrapy.log"]
     else:
-        parse_warning = None
+        warnings = [f"Log detallado: logs_auto/{nombre}_scrapy.log"]
     salida_tmp.unlink(missing_ok=True)
-    warnings = [parse_warning] if parse_warning else []
     return {"ok": bool(productos), "tienda": nombre, "productos": productos, "warnings": warnings}
 
 
@@ -192,7 +193,6 @@ def main():
     (RAIZ / "productos.json").write_text(json.dumps(todos, ensure_ascii=False, indent=2), encoding="utf-8")
 
     cambios_historial = actualizar_historial(todos)
-
     tiempo = time.time() - inicio
     print("=" * 60)
     print(f"RESUMEN — {tiempo:.1f}s")
