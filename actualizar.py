@@ -17,8 +17,8 @@ from validacion.validar import validar_resultado
 
 RAIZ = Path(__file__).parent
 SPIDERS_SCRAPY = ["compragamer", "mexx", "venex", "puertominero"]
-AUTO_TIMEOUT = 420
-SCRAPY_TIMEOUT = 3600
+AUTO_TIMEOUT = 900
+SCRAPY_TIMEOUT = 900
 AUTO_LOG_DIR = RAIZ / "logs_auto"
 SCRAPY_DIR = RAIZ / "scraper"
 
@@ -31,14 +31,7 @@ def correr_spider_scrapy(nombre):
     cmd = [sys.executable, "-m", "scrapy", "crawl", nombre, "-O", str(salida_tmp)]
     try:
         with open(log_path, "w", encoding="utf-8") as log:
-            proc = subprocess.run(
-                cmd,
-                cwd=SCRAPY_DIR,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=SCRAPY_TIMEOUT,
-            )
+            proc = subprocess.run(cmd, cwd=SCRAPY_DIR, stdout=log, stderr=subprocess.STDOUT, text=True, timeout=SCRAPY_TIMEOUT)
     except subprocess.TimeoutExpired:
         return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Timeout ejecutando spider ({SCRAPY_TIMEOUT}s). Log: logs_auto/{nombre}_scrapy.log"]}
     except FileNotFoundError:
