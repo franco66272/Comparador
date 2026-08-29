@@ -9,7 +9,6 @@ import scrapy
 class VenexHardGamersSpider(scrapy.Spider):
     name = "venex_hardgamers"
     allowed_domains = ["hardgamers.com.ar", "www.hardgamers.com.ar"]
-
     HG_BASE = "https://www.hardgamers.com.ar"
     HG_STORE = "/stores/venex"
     PAGE_SIZE = 24
@@ -18,7 +17,7 @@ class VenexHardGamersSpider(scrapy.Spider):
     custom_settings = {
         "ROBOTSTXT_OBEY": False,
         "CONCURRENT_REQUESTS_PER_DOMAIN": 2,
-        "DOWNLOAD_DELAY": 0.10,
+        "DOWNLOAD_DELAY": 0.1,
         "DOWNLOAD_TIMEOUT": 30,
         "RETRY_TIMES": 2,
         "LOG_LEVEL": "INFO",
@@ -26,7 +25,6 @@ class VenexHardGamersSpider(scrapy.Spider):
         "AUTOTHROTTLE_START_DELAY": 0.2,
         "AUTOTHROTTLE_MAX_DELAY": 5.0,
         "AUTOTHROTTLE_TARGET_CONCURRENCY": 1.5,
-        "CLOSESPIDER_ERRORCOUNT": 10,
     }
 
     def __init__(self, *args, **kwargs):
@@ -39,27 +37,15 @@ class VenexHardGamersSpider(scrapy.Spider):
         self.raw_products = set()
         self.expected_total = None
         self.expected_pages = None
-        self.parse_failures = []
 
     def hg_url(self, page):
-        query = {
-            "brand": "",
-            "limit": str(self.PAGE_SIZE),
-            "page": str(page),
-            "province": "",
-            "store": "venex",
-        }
+        query = {"brand": "", "limit": str(self.PAGE_SIZE), "page": str(page), "province": "", "store": "venex"}
         return f"{self.HG_BASE}{self.HG_STORE}?{urlencode(query)}"
 
     async def start(self):
         url = self.hg_url(1)
         self.seen_pages.add(url)
-        yield scrapy.Request(
-            url,
-            callback=self.parse_hg,
-            errback=self.errback_page,
-            meta={"page": 1},
-        )
+        yield scrapy.Request(url, callback=self.parse_hg, errback=self.errback_page, meta={"page": 1})
 
     @staticmethod
     def clean(value):
@@ -71,141 +57,103 @@ class VenexHardGamersSpider(scrapy.Spider):
         if not s:
             return None
         if "," in s and "." in s:
-            a, b = s.rsplit(",", 1)
-            s = a if len(b) <= 2 else s.replace(",", "")
-            s = s.replace(".", "")
-        elif "," in s:
-            parts = s.split(",")
-            s = parts[0] if len(parts[-1]) <= 2 else "".join(parts)
-        else:
-            s = s.replace(".", "")
+            if s.rfind(",") > s.rfind("."):
+                s = s.replace(".", "").replace(",", ".")
+            else:
+                s = s.replace(",", "")
+        elif "." in s or "," in s:
+            s = s.replace(".", "").replace(",", "")
         try:
-            n = int(s)
+            n = int(float(s))
         except ValueError:
             return None
         return n if n >= 1000 else None
 
-    def _walk_json(self, value, docs):
-        if isinstance(value, dict):
-            if self._looks_like_product(value):
-                docs.append(value)
-            for child in value.values():
-                if isinstance(child, (dict, list)):
-                    self._walk_json(child, docs)
-        elif isinstance(value, list):
-            for child in value:
-                self._walk_json(child, docs)
-
-    @staticmethod
-    def _looks_like_product(obj):
+    def _looks_like_product(self, obj):
         if not isinstance(obj, dict):
             return False
         link = obj.get("link") or obj.get("url")
-        name = obj.get("name")
-        price = obj.get("price")
-        return isinstance(link, str) and "venex.com.ar/" in link and bool(name) and price is not None
+        return isinstance(link, str) and "venex.com.ar/" in link.lower() and bool(obj.get("name")) and obj.get("price") is not None
 
-    def _decode_json_candidates(self, text):
-        candidates = [text]
-        unescaped = html.unescape(text)
-        if unescaped != text:
-            candidates.append(unescaped)
-        if "\\\"" in text:
-            candidates.append(text.replace('\\"', '"'))
+    def _walk(self, value, docs, metadata):
+        if isinstance(value, dict):
+            if self._looks_like_product(value):
+                docs.append(value)
+            for key, child in value.items():
+                if key == "total" and isinstance(child, (int, float)):
+                    metadata.setdefault("total", int(child))
+                elif key == "pages" and isinstance(child, int):
+                    metadata.setdefault("pages", child)
+                if isinstance(child, (dict, list)):
+                    self._walk(child, docs, metadata)
+        elif isinstance(value, list):
+            for child in value:
+                if isinstance(child, (dict, list)):
+                    self._walk(child, docs, metadata)
 
-        # Extract any plausible top-level JSON object from script/embedded data.
+    def _decode_embedded(self, text):
+        """Decode embedded JSON objects without assuming a specific framework."""
+        variants = [text, html.unescape(text), text.replace('\\"', '"')]
+        seen = set()
         decoder = json.JSONDecoder()
-        for candidate in candidates:
-            starts = [m.start() for m in re.finditer(r"\{", candidate)]
-            for pos in starts[:300]:
+        for variant in variants:
+            if variant in seen:
+                continue
+            seen.add(variant)
+            for match in re.finditer(r"[\[{]", variant):
                 try:
-                    obj, end = decoder.raw_decode(candidate[pos:])
-                except Exception:
+                    obj, _ = decoder.raw_decode(variant[match.start():])
+                except (ValueError, json.JSONDecodeError):
                     continue
-                if isinstance(obj, dict) and any(k in obj for k in ("docs", "total", "pages", "paginate")):
-                    yield obj
+                yield obj
 
     def extract_catalog(self, text):
         docs = []
-        total = None
-        pages = None
-        seen_payload_ids = set()
+        metadata = {}
+        for root in self._decode_embedded(text):
+            self._walk(root, docs, metadata)
 
-        for root in self._decode_json_candidates(text):
-            payloads = [root]
-            while payloads:
-                obj = payloads.pop()
-                if not isinstance(obj, dict):
-                    continue
-                marker = id(obj)
-                if marker in seen_payload_ids:
-                    continue
-                seen_payload_ids.add(marker)
-
-                if isinstance(obj.get("docs"), list):
-                    docs.extend(x for x in obj["docs"] if isinstance(x, dict))
-                if total is None and isinstance(obj.get("total"), (int, float)):
-                    total = int(obj["total"])
-                if pages is None and isinstance(obj.get("pages"), int):
-                    pages = int(obj["pages"])
-                paginate = obj.get("paginate")
-                if pages is None and isinstance(paginate, dict):
-                    page_entries = paginate.get("pages")
-                    if isinstance(page_entries, list):
-                        pages = len(page_entries)
-
-                for value in obj.values():
-                    if isinstance(value, dict):
-                        payloads.append(value)
-                    elif isinstance(value, list):
-                        payloads.extend(x for x in value if isinstance(x, dict))
-
-        # Second pass over the whole text: recover individual product objects.
-        # This handles pages where the application payload is encoded in a JS blob.
+        # Last-resort extraction for HTML containing escaped product links.
         if not docs:
-            decoder = json.JSONDecoder()
-            for marker in re.finditer(r'"link"\s*:\s*"https?://(?:www\.)?venex\.com\.ar/', text):
-                brace = text.rfind("{", 0, marker.start())
-                if brace < 0:
+            decoded = html.unescape(text).replace('\\"', '"')
+            for match in re.finditer(r'"link"\s*:\s*"(https?://(?:www\.)?venex\.com\.ar/[^"\\]+)"', decoded, re.I):
+                start = decoded.rfind("{", 0, match.start())
+                if start < 0:
                     continue
                 try:
-                    obj, _ = decoder.raw_decode(html.unescape(text[brace:]))
-                except Exception:
+                    obj, _ = json.JSONDecoder().raw_decode(decoded[start:])
+                except (ValueError, json.JSONDecodeError):
                     continue
                 if self._looks_like_product(obj):
                     docs.append(obj)
 
         unique = {}
-        for obj in docs:
-            if not self._looks_like_product(obj):
-                continue
-            pid = str(obj.get("_id") or obj.get("id") or obj.get("link") or "")
+        for doc in docs:
+            pid = str(doc.get("_id") or doc.get("id") or doc.get("link") or doc.get("url") or "")
             if pid:
-                unique[pid] = obj
+                unique[pid] = doc
 
-        if total is None:
+        if "total" not in metadata:
             m = re.search(r'"total"\s*:\s*(\d+)', text)
             if m:
-                total = int(m.group(1))
-        if pages is None:
+                metadata["total"] = int(m.group(1))
+        if "pages" not in metadata:
             m = re.search(r'"pages"\s*:\s*(\d+)', text)
             if m:
-                pages = int(m.group(1))
+                metadata["pages"] = int(m.group(1))
 
-        return list(unique.values()), total, pages
+        return list(unique.values()), metadata.get("total"), metadata.get("pages")
 
     def normalize(self, doc):
         link = str(doc.get("link") or doc.get("url") or "").strip()
-        if not link:
-            return None
         p = urlparse(link)
         if p.netloc.lower().removeprefix("www.") != "venex.com.ar":
             return None
-        clean_url = urlunparse(("https", "www.venex.com.ar", p.path, "", "", ""))
         name = self.clean(doc.get("name"))
         price = self.num(doc.get("price"))
         if not name or not price:
             return None
+        clean_url = urlunparse(("https", "www.venex.com.ar", p.path, "", "", ""))
         image = doc.get("image")
         if isinstance(image, list):
             image = image[0] if image else None
@@ -217,12 +165,9 @@ class VenexHardGamersSpider(scrapy.Spider):
                 image = "https://www.venex.com.ar/" + image.lstrip("/")
         available = bool(doc.get("availability", True)) and bool(doc.get("active", True))
         return {
-            "tienda": "Venex",
-            "nombre": name,
-            "precio": price,
+            "tienda": "Venex", "nombre": name, "precio": price,
             "precio_anterior": self.num(doc.get("previousPrice")),
-            "stock": 1 if available else 0,
-            "imagen": image,
+            "stock": 1 if available else 0, "imagen": image,
             "url": clean_url,
             "id_producto": str(doc.get("_id") or doc.get("id") or clean_url),
         }
@@ -250,17 +195,13 @@ class VenexHardGamersSpider(scrapy.Spider):
             new_count += 1
             yield product
 
-        self.logger.info(
-            "VENEX via HARDGAMERS page=%d source=%d new=%d total=%d expected_total=%s expected_pages=%s",
-            page, len(docs), new_count, len(self.seen_products), self.expected_total, self.expected_pages,
-        )
+        self.logger.info("VENEX via HARDGAMERS page=%d source=%d new=%d total=%d expected_total=%s expected_pages=%s", page, len(docs), new_count, len(self.seen_products), self.expected_total, self.expected_pages)
 
         if not docs or page >= self.MAX_PAGES:
             return
-        if self.expected_pages is not None:
-            if page >= self.expected_pages:
-                return
-        elif len(docs) < self.PAGE_SIZE:
+        if self.expected_pages is not None and page >= self.expected_pages:
+            return
+        if self.expected_pages is None and len(docs) < self.PAGE_SIZE:
             return
 
         next_url = self.hg_url(page + 1)
@@ -270,9 +211,8 @@ class VenexHardGamersSpider(scrapy.Spider):
         yield scrapy.Request(next_url, callback=self.parse_hg, errback=self.errback_page, meta={"page": page + 1})
 
     def errback_page(self, failure):
-        url = failure.request.url
-        self.pages_failed.append(url)
-        self.logger.warning("VENEX via HARDGAMERS failed: %s", url)
+        self.pages_failed.append(failure.request.url)
+        self.logger.warning("VENEX via HARDGAMERS failed: %s", failure.request.url)
 
     def closed(self, reason):
         coverage = (len(self.raw_products) / self.expected_total) if self.expected_total else None
