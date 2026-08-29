@@ -14,20 +14,20 @@ class VenexCoreSpider(scrapy.Spider):
 
     custom_settings = {
         "ROBOTSTXT_OBEY": False,
-        "CONCURRENT_REQUESTS_PER_DOMAIN": 8,
-        "DOWNLOAD_DELAY": 0.05,
-        "DOWNLOAD_TIMEOUT": 30,
-        "RETRY_TIMES": 2,
+        "CONCURRENT_REQUESTS_PER_DOMAIN": 6,
+        "DOWNLOAD_DELAY": 0.10,
+        "DOWNLOAD_TIMEOUT": 40,
+        "RETRY_TIMES": 3,
     }
 
     CATEGORY_SEEDS = [
-        "/notebooks/", "/microprocesadores/", "/perifericos/",
-        "/almacenamiento-portatil/", "/almacenamiento/", "/placas-de-video/",
-        "/componentes-de-pc/", "/pc-de-escritorio/", "/memorias-ram/", "/monitores/",
-        "/sillas-gamers/", "/accesorios/", "/impresion-y-scanners/", "/tablets/",
-        "/camaras-ip/", "/relojes-smartwatch/", "/audio/", "/conectividad/",
-        "/hogar-y-oficina/", "/soportes/", "/celulares/", "/televisores/",
+        "/",
     ]
+
+    EXCLUDED_PATH_PARTS = (
+        "resultado-busqueda", "micrositio", "configurador", "login", "cart",
+        "checkout", "mi-cuenta", "contacto", "blog", "quienes-somos",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -35,13 +35,12 @@ class VenexCoreSpider(scrapy.Spider):
         self.seen_listings = set()
         self.seen_categories = set()
         self.page_signatures = set()
-
-    async def start(self):
-        for path in self.CATEGORY_SEEDS:
-            url = self.listing_url(self.BASE + path, 1)
-            if url not in self.seen_listings:
-                self.seen_listings.add(url)
-                yield scrapy.Request(url, callback=self.parse_listing, meta={"page": 1, "discover_children": True}, dont_filter=True)
+        self.category_pages = {}
+        self.category_products = {}
+        self.category_failures = {}
+        self.discovery_pages = 0
+        self.product_urls_seen = set()
+        self.product_urls_extracted = set()
 
     @staticmethod
     def clean_text(value):
@@ -59,14 +58,22 @@ class VenexCoreSpider(scrapy.Spider):
         path = urlparse(url).path.lower()
         return path.endswith(".html") and not path.endswith(("micrositio.html", "configurador-de-pc.html", "404.html"))
 
-    def listing_url(self, url, page):
+    def _clean_path(self, path):
+        path = re.sub(r"/{2,}", "/", path or "/")
+        path = re.sub(r"/([^/]+)/\1(?=/|$)", r"/\1", path, flags=re.I)
+        return path
+
+    def listing_url(self, url, page=1):
         p = urlparse(url)
         q = {k: v[-1] for k, v in parse_qs(p.query, keep_blank_values=True).items()}
         q.pop("pagina", None)
         q.pop("page", None)
         q["limit"] = str(self.LIMIT)
         q["page"] = str(page)
-        return urlunparse((p.scheme or "https", p.netloc or "www.venex.com.ar", p.path, p.params, urlencode(q), p.fragment))
+        return urlunparse((p.scheme or "https", p.netloc or "www.venex.com.ar", self._clean_path(p.path), p.params, urlencode(q), p.fragment))
+
+    def category_key(self, url):
+        return self._clean_path(urlparse(url).path).rstrip("/").lower() or "/"
 
     @staticmethod
     def numeric_price(value):
@@ -74,9 +81,15 @@ class VenexCoreSpider(scrapy.Spider):
         if not s:
             return None
         if "," in s and "." in s:
-            s = s.split(",", 1)[0].replace(".", "")
+            left, right = s.rsplit(",", 1)
+            if right.isdigit() and len(right) <= 2:
+                s = left
+            else:
+                s = s.replace(",", "")
+            s = s.replace(".", "")
         elif "," in s:
-            s = s.split(",", 1)[0]
+            parts = s.split(",")
+            s = parts[0] if len(parts[-1]) <= 2 else "".join(parts)
         else:
             s = s.replace(".", "")
         try:
@@ -86,7 +99,13 @@ class VenexCoreSpider(scrapy.Spider):
         return n if n >= 1000 else None
 
     def find_price(self, node):
-        selectors = ("[itemprop='price']::attr(content)", "[itemprop='price']::text", "[data-price]::attr(data-price)", "[data-product-price]::attr(data-product-price)", ".product-box-price::text", ".product-price::text", ".current-price::text", ".price-final::text", ".special-price::text", ".price::text")
+        selectors = (
+            "[itemprop='price']::attr(content)", "[itemprop='price']::text",
+            "[data-price]::attr(data-price)", "[data-product-price]::attr(data-product-price)",
+            "[data-price-amount]::attr(data-price-amount)", "[data-price-value]::attr(data-price-value)",
+            ".product-box-price::text", ".product-price::text", ".current-price::text",
+            ".price-final::text", ".special-price::text", ".price::text",
+        )
         for selector in selectors:
             for raw in node.css(selector).getall():
                 price = self.numeric_price(raw)
@@ -110,7 +129,8 @@ class VenexCoreSpider(scrapy.Spider):
                 ahref = anchor.attrib.get("href", "")
                 if ahref.lower().split("?", 1)[0].endswith(".html"):
                     product_hrefs.append(ahref)
-            if len(set(product_hrefs)) == 1 and product_hrefs[0] == href and self.find_price(node):
+            unique = {response_url for response_url in product_hrefs}
+            if len(unique) == 1 and product_hrefs and product_hrefs[0] == href and self.find_price(node):
                 return node
         return None
 
@@ -135,12 +155,20 @@ class VenexCoreSpider(scrapy.Spider):
         image = None
         img = card.css("img")[:1]
         if img:
-            src = img.attrib.get("data-zoom-image") or img.attrib.get("data-large-image") or img.attrib.get("data-original") or img.attrib.get("data-lazy-src") or img.attrib.get("data-src") or img.attrib.get("src")
+            src = (img.attrib.get("data-zoom-image") or img.attrib.get("data-large-image") or
+                   img.attrib.get("data-original") or img.attrib.get("data-lazy-src") or
+                   img.attrib.get("data-src") or img.attrib.get("src"))
             if src:
                 image = response.urljoin(src)
         text = self.clean_text(card.xpath("string(.)").get()).lower()
-        stock = 0 if "sin stock" in text or "producto sin stock" in text else 1
-        return {"tienda":"Venex", "nombre":name, "precio":price, "precio_anterior":None, "stock":stock, "imagen":image, "url":url, "id_producto":url}
+        stock = 0 if any(term in text for term in ("sin stock", "producto sin stock", "agotado")) else 1
+        product = {
+            "tienda": "Venex", "nombre": name, "precio": price,
+            "precio_anterior": None, "stock": stock, "imagen": image,
+            "url": url, "id_producto": url,
+        }
+        self.product_urls_extracted.add(url)
+        return product
 
     def structured_products(self, response):
         result = []
@@ -153,7 +181,8 @@ class VenexCoreSpider(scrapy.Spider):
             while stack:
                 obj = stack.pop()
                 if isinstance(obj, list):
-                    stack.extend(obj); continue
+                    stack.extend(obj)
+                    continue
                 if not isinstance(obj, dict):
                     continue
                 if isinstance(obj.get("@graph"), list):
@@ -170,16 +199,24 @@ class VenexCoreSpider(scrapy.Spider):
                 if not name or not price or not self.same_store(url) or not self.is_product(url):
                     continue
                 image = obj.get("image")
-                if isinstance(image, list): image = image[0] if image else None
-                result.append({"tienda":"Venex", "nombre":name, "precio":price, "precio_anterior":None, "stock":1, "imagen":response.urljoin(image) if image else None, "url":url, "id_producto":str(obj.get("sku") or obj.get("mpn") or url)})
+                if isinstance(image, list):
+                    image = image[0] if image else None
+                self.product_urls_extracted.add(url)
+                result.append({
+                    "tienda": "Venex", "nombre": name, "precio": price,
+                    "precio_anterior": None, "stock": 1,
+                    "imagen": response.urljoin(image) if image else None,
+                    "url": url,
+                    "id_producto": str(obj.get("sku") or obj.get("mpn") or url),
+                })
         return result
 
     def extract_products(self, response):
         products = {p["url"]: p for p in self.structured_products(response)}
         for link in response.css("a[href$='.html'], a[href*='.html?']"):
-            p = self.extract_product(link, response)
-            if p:
-                products.setdefault(p["url"], p)
+            product = self.extract_product(link, response)
+            if product:
+                products.setdefault(product["url"], product)
         return list(products.values())
 
     def raw_product_urls(self, response):
@@ -190,46 +227,91 @@ class VenexCoreSpider(scrapy.Spider):
                 urls.add(url)
         return urls
 
-    def discover_child_categories(self, response):
+    def discover_categories(self, response):
         found = set()
-        parent = urlparse(response.url).path.rstrip("/").lower()
         for href in response.css("a[href]::attr(href)").getall():
             url = response.urljoin(href).split("#", 1)[0]
             if not self.same_store(url) or self.is_product(url):
                 continue
-            path = urlparse(url).path.rstrip("/").lower()
-            if path == parent or not path.startswith(parent + "/"):
+            path = self._clean_path(urlparse(url).path).rstrip("/") or "/"
+            low = path.lower()
+            if any(part in low for part in self.EXCLUDED_PATH_PARTS):
                 continue
-            if any(x in path for x in ("resultado-busqueda", "micrositio", "configurador", "login", "cart")):
-                continue
+            # Category/navigation URLs generally do not use .html and live below
+            # the Venex domain. Discover recursively rather than relying on a seed list.
             normalized = self.listing_url(url, 1)
-            if normalized not in self.seen_listings:
+            if normalized not in self.seen_listings and normalized not in self.seen_categories:
                 found.add(normalized)
         return found
 
+    def page_number(self, response):
+        try:
+            return max(1, int(response.meta.get("page", 1)))
+        except (TypeError, ValueError):
+            try:
+                return max(1, int(parse_qs(urlparse(response.url).query).get("page", [1])[-1]))
+            except (TypeError, ValueError):
+                return 1
+
     def parse_listing(self, response):
+        self.discovery_pages += 1
+        category = self.category_key(response.url)
+        page = self.page_number(response)
+        self.category_pages.setdefault(category, set()).add(page)
         raw_urls = self.raw_product_urls(response)
-        category = urlparse(response.url).path.rstrip("/").lower()
+        self.product_urls_seen.update(raw_urls)
         signature = (category, tuple(sorted(raw_urls)))
         repeated = signature in self.page_signatures
         self.page_signatures.add(signature)
-        for product in self.extract_products(response):
+
+        products = self.extract_products(response)
+        self.category_products.setdefault(category, set()).update(p["url"] for p in products)
+        for product in products:
             key = product["id_producto"]
-            if key not in self.seen_products:
-                self.seen_products.add(key)
-                yield product
-        page = int(response.meta.get("page", 1))
-        if response.meta.get("discover_children") and page == 1:
-            for child in self.discover_child_categories(response):
-                self.seen_categories.add(child); self.seen_listings.add(child)
-                yield scrapy.Request(child, callback=self.parse_listing, meta={"page":1, "discover_children":True})
-        if repeated or not raw_urls or len(raw_urls) < self.LIMIT or page >= self.MAX_PAGES_PER_CATEGORY:
+            if key in self.seen_products:
+                continue
+            self.seen_products.add(key)
+            yield product
+
+        if page == 1:
+            for child in self.discover_categories(response):
+                self.seen_categories.add(child)
+                self.seen_listings.add(child)
+                yield scrapy.Request(child, callback=self.parse_listing,
+                                     meta={"page": 1, "discover": True})
+
+        # Continue until the page is genuinely empty, repeated, or the hard safety cap.
+        if repeated or not raw_urls or page >= self.MAX_PAGES_PER_CATEGORY:
             return
         next_url = self.listing_url(response.url, page + 1)
         if next_url in self.seen_listings:
             return
         self.seen_listings.add(next_url)
-        yield scrapy.Request(next_url, callback=self.parse_listing, meta={"page":page+1, "discover_children":False})
+        yield scrapy.Request(next_url, callback=self.parse_listing,
+                             meta={"page": page + 1, "discover": False})
+
+    def closed(self, reason):
+        categories = len(self.seen_categories)
+        pages = sum(len(v) for v in self.category_pages.values())
+        unique_products = len(self.seen_products)
+        urls_seen = len(self.product_urls_seen)
+        urls_extracted = len(self.product_urls_extracted)
+        print("=" * 72)
+        print("VENEX CATALOG REPORT")
+        print("=" * 72)
+        print(f"reason={reason}")
+        print(f"categories_discovered={categories}")
+        print(f"listing_pages={pages}")
+        print(f"raw_product_urls={urls_seen}")
+        print(f"products_extracted={urls_extracted}")
+        print(f"products_unique={unique_products}")
+        print(f"coverage_proxy={((unique_products / urls_seen) if urls_seen else 0.0):.4f}")
+        print("category_breakdown=")
+        for category in sorted(self.category_pages):
+            page_count = len(self.category_pages[category])
+            product_count = len(self.category_products.get(category, set()))
+            print(f"  {category}: pages={page_count} products={product_count}")
+        print("=" * 72)
 
     def parse(self, response):
         yield from self.parse_listing(response)
