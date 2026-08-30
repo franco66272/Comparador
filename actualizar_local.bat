@@ -2,11 +2,6 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 
-if /i "%~1"=="auditar" goto :audit
-
-set "STATUS_FILE=%TEMP%\compararadar_git_status.txt"
-set "HAS_CHANGES="
-
 echo ================================================
 echo Compararadar - actualizacion local
 echo ================================================
@@ -15,47 +10,35 @@ echo.
 git rev-parse --is-inside-work-tree >nul 2>&1
 if errorlevel 1 goto :not_git
 
-echo [1/5] Protegiendo cambios locales...
-git status --porcelain > "%STATUS_FILE%"
-for /f "usebackq delims=" %%A in ("%STATUS_FILE%") do set "HAS_CHANGES=1"
-if defined HAS_CHANGES (
-    git stash -u -m "compararadar-auto-update-backup"
-    if errorlevel 1 goto :error
-    echo Cambios locales guardados temporalmente.
-) else (
-    echo No hay cambios locales.
-)
-if exist "%STATUS_FILE%" del /q "%STATUS_FILE%" >nul 2>&1
-
-echo.
-echo [2/5] Sincronizando con GitHub...
+echo [1/4] Sincronizando codigo desde GitHub...
 git fetch origin
 if errorlevel 1 goto :error
 
-git checkout -f main
-if errorlevel 1 goto :error
-
+rem Los JSON de catalogo, salud e historial son artefactos generados.
+rem No se intenta mezclar esos cambios con el codigo del repositorio.
 git reset --hard origin/main
 if errorlevel 1 goto :error
 
 git clean -fd
 if errorlevel 1 goto :error
+
 echo Codigo local sincronizado con origin/main.
-
 echo.
-echo [3/5] Instalando dependencias...
+
+echo [2/4] Instalando dependencias...
 py -m pip install -r requirements.txt
-if errorlevel 1 goto :pip_error
+if errorlevel 1 goto :error
 
 echo.
-echo [4/5] Ejecutando actualizacion completa del catalogo...
+echo [3/4] Ejecutando actualizacion completa del catalogo...
 py actualizar.py
 if errorlevel 1 goto :error
 
 echo.
-echo [5/5] Verificacion final...
+echo [4/4] Verificacion final...
 if not exist "productos.json" goto :catalog_missing
 if not exist "config\salud_tiendas.json" goto :health_missing
+
 for %%F in (productos.json) do echo Catalogo generado: %%~zF bytes
 
 echo.
@@ -63,20 +46,7 @@ echo ================================================
 echo ACTUALIZACION COMPLETADA
 echo ================================================
 echo.
-echo El catalogo fue actualizado y validado.
 exit /b 0
-
-:audit
-echo ================================================
-echo Compararadar - auditoria de tiendas
- echo ================================================
-echo.
-py -m extractores.auto_auditoria
-exit /b %errorlevel%
-
-:pip_error
-echo ERROR: No se pudieron instalar las dependencias.
-goto :error
 
 :not_git
 echo ERROR: esta carpeta no es un repositorio Git.
