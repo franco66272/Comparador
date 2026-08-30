@@ -221,9 +221,16 @@ def inicio_optimizado():
         clave_producto=base.clave_producto,
     )
 
-# Sustituimos los endpoints originales manteniendo exactamente las mismas URLs.
-app.view_functions["inicio"] = inicio_optimizado
-app.view_functions["producto_detalle"] = producto_optimizado
+# Mantener exactamente las URLs originales, pero reemplazar de forma robusta
+# los endpoints de Flask aunque app_base haya registrado otros nombres.
+app.view_functions["inicio_optimizado"] = inicio_optimizado
+app.view_functions["producto_optimizado"] = producto_optimizado
+
+for rule in app.url_map.iter_rules():
+    if rule.rule == "/" and "GET" in rule.methods:
+        rule.endpoint = "inicio_optimizado"
+    elif rule.rule.startswith("/producto/") and "GET" in rule.methods:
+        rule.endpoint = "producto_optimizado"
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=False)
