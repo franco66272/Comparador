@@ -1,24 +1,26 @@
-"""Entrada principal optimizada de TecnoRadar.
+"""Punto de entrada estable de TecnoRadar.
 
-El arranque rebinda explícitamente las reglas Flask heredadas de app_base.
-Esto evita depender de los nombres internos de los endpoints de la aplicación
-base y garantiza que / y /producto/<codigo> usen las vistas optimizadas.
+La aplicación optimizada ya no depende del mapa de rutas que construye
+app_base. Se crea una instancia Flask limpia y se registran explícitamente
+las rutas públicas que utiliza la interfaz. Esto evita que una ruta antigua
+registrada por app_base capture / y produzca un 404.
 """
-from app_optimizado import app, inicio_optimizado, producto_optimizado
+from flask import Flask
+
+from app_optimizado import inicio_optimizado, producto_optimizado
 
 
-def _rebind_routes():
-    app.view_functions["inicio_optimizado"] = inicio_optimizado
-    app.view_functions["producto_optimizado"] = producto_optimizado
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
-    for rule in app.url_map.iter_rules():
-        if rule.rule == "/":
-            rule.endpoint = "inicio_optimizado"
-        elif rule.rule.startswith("/producto/") and "<codigo" in rule.rule:
-            rule.endpoint = "producto_optimizado"
+# Rutas públicas de la aplicación.
+app.add_url_rule("/", endpoint="inicio", view_func=inicio_optimizado, methods=["GET"])
+app.add_url_rule(
+    "/producto/<codigo>",
+    endpoint="producto",
+    view_func=producto_optimizado,
+    methods=["GET"],
+)
 
-
-_rebind_routes()
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=False)
