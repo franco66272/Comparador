@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import time
 from datetime import datetime
@@ -100,8 +101,7 @@ def convertir_serie(obj):
         elif isinstance(item, (list, tuple)) and len(item) >= 2:
             a, b = item[0], item[1]
             date, price = (a, b) if es_fecha(a) else ((b, a) if es_fecha(b) else (None, None))
-        else:
-            continue
+        else: continue
         parsed = parse_precio(price)
         if date is not None and parsed is not None and es_fecha(date):
             out.append({"fecha": normalizar_fecha(date), "precio": parsed, "stock": None, "fuente": "HardGamers"})
@@ -130,17 +130,8 @@ def recorrer(obj, encontrados=None, depth=0):
 def extraer_texto(texto):
     encontrados = []
     if not texto: return encontrados
-    try:
-        obj = json.loads(texto)
-        encontrados.extend(recorrer(obj))
+    try: encontrados.extend(recorrer(json.loads(texto)))
     except Exception: pass
-    # También intenta objetos serializados dentro de scripts / blobs JS.
-    for m in re.finditer(r"\[[^\[\]]{20,}\]", texto, re.S):
-        try: encontrados.extend(recorrer(json.loads(m.group(0))))
-        except Exception: pass
-    for m in re.finditer(r"\{\"(?:date|fecha|timestamp|time)[\s\S]{10,200}\}", texto, re.I):
-        try: encontrados.extend(recorrer(json.loads(m.group(0))))
-        except Exception: pass
     return encontrados
 
 
@@ -164,19 +155,20 @@ def extract_http(url, session):
     candidates = extraer_texto(r.text)
     for script in soup.find_all("script"):
         txt = script.string or script.get_text(" ", strip=False)
-        if txt and len(txt) < 10_000_000: candidates.extend(extraer_texto(txt))
+        if txt and len(txt) < 12_000_000: candidates.extend(extraer_texto(txt))
     return max(candidates, key=len, default=[]), {"status": r.status_code, "url": url, "content_type": r.headers.get("Content-Type", ""), "size": len(r.text)}
 
 
-def extract_browser(url, browser, sink):
+def extraer_historial_browser(url, browser, sink):
     context = browser.new_context(user_agent=HEADERS["User-Agent"], locale="es-AR")
     page = context.new_page(); candidates=[]; responses=[]
     def on_response(resp):
         try:
-            ct=(resp.headers.get("content-type") or "").lower(); body=resp.text()
-            if len(body)>8_000_000: return
-            interesting = "json" in ct or "javascript" in ct or any(k in resp.url.lower() for k in ("api", "graphql", "ajax", "chart", "price", "history", "historial", "data"))
+            ct=(resp.headers.get("content-type") or "").lower()
+            interesting="json" in ct or "javascript" in ct or any(k in resp.url.lower() for k in ("api","graphql","ajax","chart","price","history","historial","data","product"))
             if not interesting: return
+            body=resp.text()
+            if len(body)>8_000_000: return
             responses.append({"url":resp.url,"status":resp.status,"content_type":ct,"size":len(body)})
             candidates.extend(extraer_texto(body))
         except Exception: pass
@@ -186,31 +178,34 @@ def extract_browser(url, browser, sink):
         page.wait_for_timeout(1200)
         candidates.extend(extraer_texto(page.content()))
         for txt in page.locator("script").all_text_contents():
-            if txt and len(txt)<10_000_000: candidates.extend(extraer_texto(txt))
+            if txt and len(txt)<12_000_000: candidates.extend(extraer_texto(txt))
+        try: sink["storage"]=page.evaluate("() => ({local:{...localStorage},session:{...sessionStorage}})")
+        except Exception: pass
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         page.wait_for_timeout(2200)
-        sink["responses"] = responses[-250:]
-        sink["resources"] = page.evaluate("() => performance.getEntriesByType('resource').map(x => x.name).slice(-400)")
+        sink["responses"]=responses[-250:]
+        sink["resources"]=page.evaluate("() => performance.getEntriesByType('resource').map(x => x.name).slice(-400)")
+        sink["html_sample"]=page.content()[:200000]
     finally:
         page.close(); context.close()
     return max(candidates, key=len, default=[])
 
 
 def main():
-    catalog = json.loads(CATALOGO.read_text(encoding="utf-8"))
-    try: history = json.loads(HISTORIAL.read_text(encoding="utf-8")) if HISTORIAL.exists() else {}
-    except Exception: history = {}
-    objectives = [p for p in catalog if str(p.get("tienda", "")).strip().lower()=="venex" and url_hardgamers(p)]
-    limit = 0
-    try: limit = int(__import__("os").environ.get("HG_MAX_PRODUCTOS", "0"))
-    except ValueError: pass
-    if limit: objectives = objectives[:limit]
-    results={"inicio":datetime.now().isoformat(),"objetivos":len(objectives),"id_directo":len(objectives),"match":len(objectives),"series":0,"puntos":0,"fallback_browser":0,"errores":[],"modo":"direct-id-http-playwright-v3"}
+    catalog=json.loads(CATALOGO.read_text(encoding="utf-8"))
+    try: history=json.loads(HISTORIAL.read_text(encoding="utf-8")) if HISTORIAL.exists() else {}
+    except Exception: history={}
+    objectives=[p for p in catalog if str(p.get("tienda","")).strip().lower()=="venex" and url_hardgamers(p)]
+    try: limit=int(os.environ.get("HG_MAX_PRODUCTOS","0") or "0")
+    except ValueError: limit=0
+    if limit>0: objectives=objectives[:limit]
+    results={"inicio":datetime.now().isoformat(),"objetivos":len(objectives),"id_directo":len(objectives),"match":len(objectives),"series":0,"puntos":0,"fallback_browser":0,"errores":[],"modo":"direct-id-http-playwright-v5"}
     debug={"productos":[]}
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        results["errores"].append({"error":"playwright_no_instalado"}); REPORT.parent.mkdir(exist_ok=True); REPORT.write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding="utf-8"); return 2
+        results["errores"].append({"error":"playwright_no_instalado"})
+        REPORTE.parent.mkdir(exist_ok=True); REPORTE.write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding="utf-8"); return 2
     session=requests.Session(); session.headers.update(HEADERS)
     with sync_playwright() as pw:
         browser=pw.chromium.launch(headless=True)
@@ -220,19 +215,21 @@ def main():
                 series,http=extract_http(url,session); sink["http"]=http
                 if len(series)<2:
                     results["fallback_browser"]+=1
-                    series=extract_browser(url,browser,sink)
+                    series=extraer_historial_browser(url,browser,sink)
                 if len(series)>=2:
                     history[key]=series; results["series"]+=1; results["puntos"]+=len(series); sink["serie_puntos"]=len(series)
                 else:
                     results["errores"].append({"producto":p.get("nombre"),"url":url,"error":"sin_serie"})
             except Exception as exc:
                 results["errores"].append({"producto":p.get("nombre"),"url":url,"error":f"{type(exc).__name__}: {exc}"})
-            if len(debug["productos"])<MAX_DEBUG: debug["productos"].append(sink)
+            debug["productos"].append(sink)
             if i%25==0 or i==len(objectives): print(f"[{i}/{len(objectives)}] ids={results['id_directo']} series={results['series']} puntos={results['puntos']} browser={results['fallback_browser']}")
             time.sleep(PAUSA)
         browser.close()
-    HISTORY.write_text(json.dumps(history,ensure_ascii=False,indent=2),encoding="utf-8")
-    REPORT.parent.mkdir(exist_ok=True); results["fin"]=datetime.now().isoformat(); REPORT.write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding="utf-8")
+    HISTORIAL.write_text(json.dumps(history,ensure_ascii=False,indent=2),encoding="utf-8")
+    REPORTE.parent.mkdir(exist_ok=True)
+    results["fin"]=datetime.now().isoformat()
+    REPORTE.write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding="utf-8")
     DEBUG.write_text(json.dumps(debug,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps(results,ensure_ascii=False,indent=2)); return 0
 
