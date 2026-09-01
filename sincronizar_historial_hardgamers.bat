@@ -3,8 +3,8 @@ setlocal
 cd /d "%~dp0"
 
 echo ================================================================
-echo TECNORADAR - IMPORTADOR DE HISTORIAL HARDGAMERS
-echo ================================================================
+echo TECNORADAR - HISTORIAL HARDGAMERS
+ echo ================================================================
 echo.
 
 echo [1/2] Verificando Playwright...
@@ -20,7 +20,8 @@ py -m playwright install chromium
 if errorlevel 1 goto :error
 
 echo.
-echo Iniciando importacion. El proceso usa pausas y reintentos para evitar HTTP 429.
+echo Usando IDs directos de HardGamers; no se ejecuta el buscador por producto.
+echo Esto reduce los 429 y evita falsos matches.
 echo.
 py importar_historial_hardgamers.py
 if errorlevel 1 goto :error
