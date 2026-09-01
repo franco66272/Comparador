@@ -24,7 +24,6 @@ IMAGEN_HEADERS = {
     "Accept-Language": "es-AR,es;q=0.9",
 }
 PLACEHOLDER_IMAGEN_PATTERNS = ("a12.svg", "a13.svg", "a14.svg", "fuego.png", "placeholder", "no-image", "no_image", "default-image", "copito.png")
-_CACHE_IMAGENES = {}
 NOMBRES_TIENDAS = {"rockethard_com_ar":"Rocket Hard", "liontech_gaming_com":"Liontech Gaming", "armytech_com_ar":"Armytech", "fullh4rd_com_ar":"Fullh4rd", "katech_com_ar":"Katech", "mymcomputacion_com":"MYM Computación", "slot_one_com_ar":"Slot One", "hypergaming_com_ar":"Hypergaming", "gezatek_com_ar":"Gezatek", "insumosacuario_com_ar":"Insumos Acuario", "gamingcity_com_ar":"Gaming City", "xt_pc_com_ar":"XT-PC", "vrx_com_ar":"VRX", "spacegamer_com_ar":"Space Gamer", "shopgamer_com_ar":"Shop Gamer", "portalstore_com_ar":"Portal Store", "noxiestore_com":"Noxie Store", "megasoftargentina_com_ar":"Megasoft Argentina", "integradosargentinos_com":"Integrados Argentinos", "hardcorecomputacion_com_ar":"Hardcore Computación", "compufanstore_com_ar":"Compufan Store", "backupcomputacion_com":"Backup Computación", "37bytes_com_ar":"37Bytes", "710tech_com_ar":"710 Tech", "ngtechnologies_com_ar":"NG Technologies", "gamerfactory_com_ar":"Gamer Factory", "necxus_com_ar":"Necxus", "netgaming_ar":"Netgaming", "compragamer_com":"CompraGamer", "mexx_com_ar":"Mexx", "venex_com_ar":"Venex", "puertominero_com_ar":"Puerto Minero", "quantum_com":"Quantum", "logg_com_ar":"Logg", "maximus_com_ar":"Maximus", "wiztech_com_ar":"WIZ TECH", "thegamershop_com_ar":"The Gamer Shop", "scphardstore_com":"SCP Hardstore", "maxtecno_com_ar":"Max Tecno", "goldentechstore_com_ar":"GoldenTech Store", "dinobyte_ar":"Dinobyte", "clickgaming_com_ar":"Click Gaming", "universosgamers_com_ar":"Universos Gamers", "empeniogamer_com_ar":"Empeño Gamer", "silverhard_com":"Silver Hard"}
 DOMINIOS_TIENDAS = {k: v for k, v in {"katech_com_ar":"katech.com.ar", "shopgamer_com_ar":"shopgamer.com.ar", "gamingcity_com_ar":"gamingcity.com.ar", "insumosacuario_com_ar":"insumosacuario.com.ar", "fullh4rd_com_ar":"fullh4rd.com.ar", "gezatek_com_ar":"gezatek.com.ar", "mymcomputacion_com":"mymcomputacion.com", "xt_pc_com_ar":"xt-pc.com.ar", "hardcorecomputacion_com_ar":"hardcorecomputacion.com.ar", "integradosargentinos_com":"integradosargentinos.com", "rockethard_com_ar":"rockethard.com.ar", "hypergaming_com_ar":"hypergaming.com.ar", "liontech_gaming_com":"liontech-gaming.com", "710tech_com_ar":"710tech.com.ar", "noxiestore_com":"noxiestore.com", "compufanstore_com_ar":"compufanstore.com.ar", "armytech_com_ar":"armytech.com.ar", "ngtechnologies_com_ar":"ngtechnologies.com.ar", "megasoftargentina_com_ar":"megasoftargentina.com.ar", "backupcomputacion_com":"backupcomputacion.com", "spacegamer_com_ar":"spacegamer.com.ar", "portalstore_com_ar":"portalstore.com.ar", "slot_one_com_ar":"slot-one.com.ar", "gamerfactory_com_ar":"gamerfactory.com.ar", "netgaming_ar":"netgaming.ar", "necxus_com_ar":"necxus.com.ar", "compragamer_com":"compragamer.com", "mexx_com_ar":"mexx.com.ar", "venex_com_ar":"venex.com.ar", "puertominero_com_ar":"puertominero.com.ar", "quantum_com":"quantumhardstore.com", "logg_com_ar":"logg.com.ar", "maximus_com_ar":"maximus.com.ar", "wiztech_com_ar":"wiztech.com.ar", "thegamershop_com_ar":"thegamershop.com.ar", "scphardstore_com":"scphardstore.com", "maxtecno_com_ar":"maxtecno.com.ar", "goldentechstore_com_ar":"goldentechstore.com.ar", "dinobyte_ar":"dinobyte.ar", "clickgaming_com_ar":"clickgaming.com.ar", "universosgamers_com_ar":"universosgamers.com.ar", "empeniogamer_com_ar":"empeniogamer.com.ar", "silverhard_com":"silverhard.com"}.items()}
 LOGOS_TIENDAS = {}
@@ -50,8 +49,7 @@ def _imagen_candidata(valor, base_url):
 def logo_tienda_url(tienda):
     clave = str(tienda or "").strip()
     override = LOGOS_TIENDAS.get(clave)
-    if override:
-        return override
+    if override: return override
     dominio = DOMINIOS_TIENDAS.get(clave)
     return f"https://www.google.com/s2/favicons?domain={dominio}&sz=128" if dominio else ""
 
@@ -114,6 +112,10 @@ def guardar_json_seguro(path, data):
     with open(tmp, "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
     with _data_cache_lock: _data_cache[path] = (time.time(), data)
+
+def cargar_detalles():
+    """Carga los detalles enriquecidos de productos; devuelve {} si aún no existe."""
+    return cargar_json_seguro("detalles_productos.json", {})
 
 def extraer_detalle_en_vivo(url):
     resultado = {"ok": False, "precio": None, "descripcion": "", "imagen": None, "verificado_en": None, "error": None}
