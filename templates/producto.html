@@ -24,7 +24,7 @@
     <section class="product-spotlight">
         <div class="detail-media">
             {% set foto = detalle.get('imagen') or producto.imagen %}
-            {% if foto and imagen_utilizable(foto) %}<img src="{{ foto }}" alt="{{ producto.nombre }}" referrerpolicy="no-referrer">{% elif producto.url %}<img src="{{ url_for('resolver_imagen', imagen=producto.imagen or '', producto=producto.url) }}" alt="{{ producto.nombre }}" referrerpolicy="no-referrer">{% else %}<div class="sin-imagen">Sin imagen</div>{% endif %}
+            {% if foto and imagen_utilizable(foto) %}<img src="{{ foto }}" alt="{{ producto.nombre }}" referrerpolicy="no-referrer">{% else %}<div class="sin-imagen">Sin imagen</div>{% endif %}
         </div>
         <div class="detail-summary">
             <div class="detail-store-row"><span class="detail-store">{{ nombre_tienda_visible(producto.tienda) }}</span><span class="verified-pill">✓ Fuente oficial</span></div>
@@ -74,7 +74,7 @@ if(svg&&serie.length){
  const W=900,H=330,left=68,right=24,top=22,bottom=42,plotW=W-left-right,plotH=H-top-bottom;
  const values=serie.map(x=>Number(x.precio)).filter(Number.isFinite);
  let mn=Math.min(...values),mx=Math.max(...values);
- if(mn===mx){mn-=Math.max(1,mn*.05);mx+=Math.max(1,mx*.05)}
+ if(mn===mx){mn-=Math.max(1,mn*.05);mx+=Math.max(1,mn*.05)}
  const pad=(mx-mn)*.08;mn=Math.max(0,mn-pad);mx+=pad;
  const X=i=>left+(serie.length===1?plotW/2:i*(plotW/(serie.length-1)));
  const Y=v=>top+((mx-v)/(mx-mn))*plotH;
