@@ -6,7 +6,7 @@ import json
 import os
 import re
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -25,6 +25,7 @@ PAUSE = 0.2
 MAX_429 = 4
 DATE_KEYS = ("fecha","date","datetime","timestamp","time","created_at","createdAt","day","x","t")
 PRICE_KEYS = ("precio","price","value","amount","valor","cost","y","v")
+CHART_CONFIG_RE = re.compile(r"\b(?:var|let|const)\s+chartConfig\s*=\s*", re.I)
 
 
 def product_key(p):
@@ -130,6 +131,103 @@ def extract_text(text):
     return found
 
 
+def json_object_after(text, match):
+    """Return the JSON object beginning at *match*, without executing page JS."""
+    start = text.find("{", match.end())
+    if start < 0:
+        return None
+    depth = 0; quoted = False; escaped = False
+    for pos in range(start, len(text)):
+        char = text[pos]
+        if quoted:
+            if escaped: escaped = False
+            elif char == "\\": escaped = True
+            elif char == '"': quoted = False
+            continue
+        if char == '"': quoted = True
+        elif char == "{": depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                try: return json.loads(text[start:pos + 1])
+                except json.JSONDecodeError: return None
+    return None
+
+
+def chart_dates(labels):
+    """Chart labels are DD-MM; infer the year from their chronological order."""
+    parsed = []
+    for label in labels:
+        match = re.fullmatch(r"\s*(\d{1,2})-(\d{1,2})\s*", str(label))
+        if not match:
+            return []
+        parsed.append((int(match.group(1)), int(match.group(2))))
+    if not parsed:
+        return []
+    today = date.today(); year = today.year
+    # The final label is the site's current observation.  A year rollover is
+    # visible when the chronological sequence goes from December to January.
+    try:
+        last_this_year = date(year, parsed[-1][1], parsed[-1][0])
+    except ValueError:
+        return []
+    # Allow a small server/time-zone skew; a chart ending tomorrow still
+    # belongs to the current year, while a December chart seen in January does not.
+    if last_this_year > today + timedelta(days=2): year -= 1
+    dates = []
+    previous = None
+    for day, month in parsed:
+        if previous and (month, day) < (previous[1], previous[0]): year += 1
+        try: dates.append(date(year, month, day).isoformat())
+        except ValueError: return []
+        previous = (day, month)
+    return dates
+
+
+def extract_chart_config(text):
+    """Extract HardGamers' public inline Chart.js history configuration."""
+    for match in CHART_CONFIG_RE.finditer(text or ""):
+        config = json_object_after(text, match)
+        if not isinstance(config, dict):
+            continue
+        data = config.get("data")
+        if not isinstance(data, dict):
+            continue
+        labels = data.get("labels"); datasets = data.get("datasets")
+        if not isinstance(labels, list) or not isinstance(datasets, list) or not datasets:
+            continue
+        values = datasets[0].get("data") if isinstance(datasets[0], dict) else None
+        dates = chart_dates(labels)
+        if not dates or not isinstance(values, list):
+            continue
+        points = []
+        for day, value in zip(dates, values):
+            price = parse_price(value)
+            if price is not None:
+                points.append({"fecha": day, "precio": price, "stock": None, "fuente": "HardGamers (historial público)"})
+        if len(points) >= 2:
+            return points
+    return []
+
+
+def extract_current_price(soup):
+    node = soup.select_one('[itemprop="price"]')
+    return parse_price(node.get("content") if node else None)
+
+
+def merge_points(existing, incoming):
+    """Union points safely; never discard a prior history after a failed fetch."""
+    valid = [x for x in (existing if isinstance(existing, list) else []) if isinstance(x, dict) and parse_price(x.get("precio"))]
+    valid.extend(incoming)
+    seen = set(); merged = []
+    for point in sorted(valid, key=lambda x: str(x.get("fecha", ""))):
+        normalized = dict(point); normalized["precio"] = parse_price(point.get("precio"))
+        signature = (str(normalized.get("fecha", "")), normalized["precio"], str(normalized.get("fuente", "")))
+        if signature not in seen:
+            seen.add(signature); merged.append(normalized)
+    return merged[-180:]
+
+
 def get(session,url):
     for attempt in range(MAX_429+1):
         r=session.get(url,headers=HEADERS,timeout=TIMEOUT)
@@ -146,10 +244,12 @@ def extract_http(url,session):
     r=get(session,url)
     soup=BeautifulSoup(r.text,"lxml")
     candidates=extract_text(r.text)
+    chart=extract_chart_config(r.text)
+    if chart: candidates.append(chart)
     for sc in soup.find_all("script"):
         txt=sc.string or sc.get_text(" ",strip=False)
         if txt and len(txt)<12_000_000: candidates.extend(extract_text(txt))
-    return max(candidates,key=len,default=[]),{"status":r.status_code,"url":url,"size":len(r.text),"content_type":r.headers.get("Content-Type","")}
+    return max(candidates,key=len,default=[]), extract_current_price(soup), {"status":r.status_code,"url":url,"size":len(r.text),"content_type":r.headers.get("Content-Type","")}
 
 
 def extract_browser(url,browser,debug):
@@ -188,7 +288,7 @@ def main():
     try: limit=int(os.environ.get("HG_MAX_PRODUCTOS","0") or "0")
     except ValueError: limit=0
     if limit>0: objectives=objectives[:limit]
-    results={"inicio":datetime.now().isoformat(),"objetivos":len(objectives),"id_directo":len(objectives),"match":len(objectives),"series":0,"puntos":0,"fallback_browser":0,"sin_serie":0,"errores":[],"modo":"direct-id-http-playwright-v8"}
+    results={"inicio":datetime.now().isoformat(),"objetivos":len(objectives),"id_directo":len(objectives),"match":len(objectives),"series":0,"series_historicas":0,"puntos":0,"puntos_actuales":0,"fallback_browser":0,"sin_serie":0,"errores":[],"modo":"direct-id-inline-chartconfig-http-playwright-v9"}
     debug={"productos":[]}
     from playwright.sync_api import sync_playwright
     session=requests.Session(); session.headers.update(HEADERS)
@@ -197,13 +297,18 @@ def main():
         for i,p in enumerate(objectives,1):
             url=hg_url(p); key=product_key(p); d={"producto":p.get("nombre"),"url":url}
             try:
-                serie,http=extract_http(url,session); d["http"]=http
+                serie,current_price,http=extract_http(url,session); d["http"]=http
                 if len(serie)<2:
                     results["fallback_browser"]+=1; serie=extract_browser(url,browser,d)
                 if len(serie)>=2:
-                    history[key]=serie; results["series"]+=1; results["puntos"]+=len(serie); d["serie_puntos"]=len(serie)
+                    history[key]=merge_points(history.get(key, []), serie)
+                    results["series"]+=1; results["series_historicas"]+=1; results["puntos"]+=len(serie); d["serie_puntos"]=len(serie)
                 else:
                     results["sin_serie"]+=1; results["errores"].append({"producto":p.get("nombre"),"url":url,"error":"sin_serie"})
+                    if current_price is not None:
+                        point={"fecha":datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),"precio":current_price,"stock":p.get("stock"),"fuente":"HardGamers (precio actual)"}
+                        history[key]=merge_points(history.get(key, []), [point])
+                        results["puntos_actuales"]+=1; d["precio_actual"]=current_price
             except Exception as exc:
                 results["errores"].append({"producto":p.get("nombre"),"url":url,"error":f"{type(exc).__name__}: {exc}"})
             if len(debug["productos"])<3: debug["productos"].append(d)
@@ -214,6 +319,15 @@ def main():
     results["fin"]=datetime.now().isoformat()
     REPORT.write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding="utf-8")
     DEBUG.write_text(json.dumps(debug,ensure_ascii=False,indent=2),encoding="utf-8")
-    print(json.dumps(results,ensure_ascii=False,indent=2)); return 0
+    print(json.dumps(results,ensure_ascii=False,indent=2))
+    # Distinct result codes let the batch describe the actual outcome.
+    if results["series_historicas"] == len(objectives) and not results["errores"]:
+        return 0
+    if not results["series_historicas"] and results["puntos_actuales"]:
+        return 3
+    if results["series_historicas"] or results["puntos_actuales"]:
+        return 4
+    # Completed without usable data: keep prior history and report a warning.
+    return 2
 
 if __name__=="__main__": raise SystemExit(main())
