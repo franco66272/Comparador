@@ -25,7 +25,8 @@
 
   async function init(){
     if(!codigo){$('productName').textContent='Producto no encontrado';return;}
-    const productPromise=fetch(`data/productos/${encodeURIComponent(codigo)}.json`,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});
+    const productUrl=`data/productos/${encodeURIComponent(codigo)}.json`;
+    const productPromise=fetch(productUrl,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});
     const metaPromise=fetch('data/catalogo_meta.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null);
     try{
       const [data,meta]=await Promise.all([productPromise,metaPromise]);
@@ -34,11 +35,24 @@
         for(const c of meta.categorias){const a=document.createElement('a');a.className='category-item';a.href=`https://tecnoradar.onrender.com/?categoria=${encodeURIComponent(c.nombre)}`;a.innerHTML=`<span>${esc(c.nombre)}</span><small>${Number(c.productos||0).toLocaleString('es-AR')}</small>`;panel.appendChild(a);}
       }
       const p=data.producto||{},d=data.detalle||{},h=Array.isArray(data.historial)?data.historial:[],tienda=safe(p.tienda),tiendaNombre=safe(p.tienda_nombre)||nameStore(tienda);
+      const fingerprint=JSON.stringify([p.actualizado_en,p.precio,p.stock,h.length,h.length?h[h.length-1]:null]);
       document.title='TecnoRadar - '+safe(p.nombre);$('productName').textContent=safe(p.nombre)||'Producto';$('storeName').textContent=tiendaNombre;$('storeNav').textContent=tiendaNombre;$('storeCrumb').textContent=tiendaNombre;
       $('storeLink').href=`https://tecnoradar.onrender.com/?tienda=${encodeURIComponent(tienda)}`;$('storeNav').href=`https://tecnoradar.onrender.com/?tienda=${encodeURIComponent(tienda)}`;$('storeCrumb').href=`https://tecnoradar.onrender.com/?tienda=${encodeURIComponent(tienda)}`;$('officialLink').href=safe(p.url)||'#';$('verifyLink').href=`https://tecnoradar.onrender.com/producto/${encodeURIComponent(codigo)}?verificar=1`;
       const img=safe(d.imagen)||safe(p.imagen);$('detailMedia').innerHTML=img?`<img src="${esc(img)}" alt="${esc(p.nombre)}" referrerpolicy="no-referrer">`:'<div class="sin-imagen">Sin imagen</div>';$('priceCurrent').textContent=money(p.precio);
       if(p.precio_anterior&&Number(p.precio_anterior)>Number(p.precio)){const pct=Math.round((1-Number(p.precio)/Number(p.precio_anterior))*100);$('discount').hidden=false;$('discount').textContent='-'+pct+'%';}
       const stock=Number(p.stock);$('stockLabel').textContent=stock>0?'En stock':'Sin stock';$('stockLabel').classList.toggle('ok',stock>0);$('verifiedLabel').textContent=p.actualizado_en?('Actualizado: '+String(p.actualizado_en).replace('T',' ').slice(0,16)):'Actualización automática';$('description').textContent=safe(d.descripcion)||'La descripción detallada se incorporará cuando esté disponible en la fuente oficial.';$('historyCount').textContent=h.length+' registro'+(h.length===1?'':'s');if(h.length)drawChart(h);
+      // GitHub Pages receives fresh product JSON after every automatic run.
+      // Polling the tiny per-product file keeps an open chart current without
+      // loading the full catalog or asking the visitor to refresh manually.
+      setInterval(async()=>{
+        if(document.hidden)return;
+        try{
+          const latest=await fetch(`${productUrl}?v=${Date.now()}`,{cache:'no-store'}).then(r=>r.ok?r.json():null);
+          const lp=latest&&latest.producto||{},lh=latest&&Array.isArray(latest.historial)?latest.historial:[];
+          const next=JSON.stringify([lp.actualizado_en,lp.precio,lp.stock,lh.length,lh.length?lh[lh.length-1]:null]);
+          if(next!==fingerprint) location.reload();
+        }catch(_){ /* A transient offline request must not interrupt the page. */ }
+      },60000);
     }catch(err){$('productName').textContent='No se pudo cargar el producto';$('description').textContent='Intentá nuevamente en unos segundos.';console.error(err);}
   }
   init();

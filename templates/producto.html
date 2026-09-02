@@ -88,5 +88,10 @@ if(svg&&serie.length){
  serie.forEach((x,i)=>{const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',X(i));c.setAttribute('cy',Y(Number(x.precio)));c.setAttribute('r',serie.length<12?'5':'3.5');c.setAttribute('class','price-chart-dot');c.addEventListener('mouseenter',()=>{const rect=svg.getBoundingClientRect(),stageRect=stage.getBoundingClientRect(),scaleX=rect.width/W,scaleY=rect.height/H;tooltip.hidden=false;tooltip.querySelector('.price-chart-tooltip-date').textContent=shortDate(x.fecha);tooltip.querySelector('.price-chart-tooltip-price').textContent=fmt(Number(x.precio));tooltip.style.left=(X(i)*scaleX+rect.left-stageRect.left)+'px';tooltip.style.top=(Y(Number(x.precio))*scaleY+rect.top-stageRect.top)+'px'});c.addEventListener('mouseleave',()=>tooltip.hidden=true);dots.appendChild(c)});
 }
 </script>{% endif %}
+<script>
+// The catalog and history are refreshed automatically by the update runner.
+// Refresh an open dynamic product page periodically so its graph follows them.
+setInterval(function(){ if (!document.hidden) window.location.reload(); }, 300000);
+</script>
 </body>
 </html>
