@@ -38,33 +38,24 @@ def correr_spider_scrapy(nombre):
         return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Timeout ejecutando spider ({SCRAPY_TIMEOUT}s). Log: logs_auto/{nombre}_scrapy.log"]}
     except OSError as exc:
         return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"No se pudo ejecutar spider: {exc}"]}
-
     if proc.returncode != 0 or not salida_tmp.exists():
         return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Spider falló (exit {proc.returncode}). Log: logs_auto/{nombre}_scrapy.log"]}
-
     productos = _read_json(salida_tmp)
     salida_tmp.unlink(missing_ok=True)
     if not isinstance(productos, list):
         return {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"JSON del spider inválido. Log: logs_auto/{nombre}_scrapy.log"]}
-
     resultado = {"ok": bool(productos), "tienda": nombre, "productos": productos, "warnings": [f"Log detallado: logs_auto/{nombre}_scrapy.log"]}
     if nombre == "venex":
-        reporte_path = AUTO_LOG_DIR / "venex_scrapy.log"
-        texto = ""
         try:
-            texto = reporte_path.read_text(encoding="utf-8", errors="replace")
+            texto = (AUTO_LOG_DIR / "venex_scrapy.log").read_text(encoding="utf-8", errors="replace")
         except OSError:
-            pass
+            texto = ""
         import re
-        for key, pattern in (
-            ("expected_product_urls", r"expected_total=(\d+)"),
-            ("expected_pages", r"expected_pages=(\d+)"),
-            ("extracted_product_urls", r"products_unique=(\d+)"),
-        ):
+        for key, pattern in (("expected_product_urls", r"expected_total=(\d+)"), ("expected_pages", r"expected_pages=(\d+)"), ("extracted_product_urls", r"products_unique=(\d+)")):
             matches = re.findall(pattern, texto)
             if matches:
                 resultado[key] = int(matches[-1])
-        if "expected_product_urls" in resultado and resultado["expected_product_urls"]:
+        if resultado.get("expected_product_urls"):
             resultado["coverage"] = resultado.get("extracted_product_urls", len(productos)) / resultado["expected_product_urls"]
     return resultado
 
