@@ -1,5 +1,7 @@
 """Motor central del comparador de precios."""
+import hashlib
 import json
+import re
 import subprocess
 import sys
 import time
@@ -50,7 +52,6 @@ def correr_spider_scrapy(nombre):
             texto = (AUTO_LOG_DIR / "venex_scrapy.log").read_text(encoding="utf-8", errors="replace")
         except OSError:
             texto = ""
-        import re
         for key, pattern in (("expected_product_urls", r"expected_total=(\d+)"), ("expected_pages", r"expected_pages=(\d+)"), ("extracted_product_urls", r"products_unique=(\d+)")):
             matches = re.findall(pattern, texto)
             if matches:
@@ -81,8 +82,7 @@ def correr_extractor_auto(extractor, nombre):
         resultado = {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Resultado inválido: {exc}"]}
     finally:
         salida_tmp.unlink(missing_ok=True)
-    resultado.setdefault("warnings", [])
-    resultado["warnings"].append(f"Log detallado: logs_auto/{nombre}.log")
+    resultado.setdefault("warnings", []).append(f"Log detallado: logs_auto/{nombre}.log")
     return resultado
 
 
@@ -105,7 +105,6 @@ def actualizar_historial(todos):
         historial = {}
     ahora = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     cambios = 0
-    import hashlib
     for producto in todos:
         precio = producto.get("precio")
         if not isinstance(precio, (int, float)) or precio <= 0:
@@ -148,18 +147,19 @@ def main():
             tiendas_auto = {}
         pendientes = [(n, c.get("extractor")) for n, c in tiendas_auto.items() if c.get("estado") == "activo" and n not in resultados and c.get("extractor")]
         futures = {}
-        with ThreadPoolExecutor(max_workers=min(8, max(1, len(pendientes)))) as pool:
-            for nombre, extractor in pendientes:
-                print(f"[auto:{nombre}] encolado...")
-                futures[pool.submit(correr_extractor_auto, extractor, nombre)] = nombre
-            for future in as_completed(futures):
-                nombre = futures[future]
-                try:
-                    resultado_auto = future.result()
-                except Exception as exc:
-                    resultado_auto = {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Error: {exc}"]}
-                print(f"[auto:{nombre}] {len(resultado_auto.get('productos', []))} productos | cobertura={resultado_auto.get('coverage', 'n/a')}")
-                procesar_tienda(nombre, resultado_auto, reportes, resultados)
+        if pendientes:
+            with ThreadPoolExecutor(max_workers=min(8, len(pendientes))) as pool:
+                for nombre, extractor in pendientes:
+                    print(f"[auto:{nombre}] encolado...")
+                    futures[pool.submit(correr_extractor_auto, extractor, nombre)] = nombre
+                for future in as_completed(futures):
+                    nombre = futures[future]
+                    try:
+                        resultado_auto = future.result()
+                    except Exception as exc:
+                        resultado_auto = {"ok": False, "tienda": nombre, "productos": [], "warnings": [f"Error: {exc}"]}
+                    print(f"[auto:{nombre}] {len(resultado_auto.get('productos', []))} productos | cobertura={resultado_auto.get('coverage', 'n/a')}")
+                    procesar_tienda(nombre, resultado_auto, reportes, resultados)
 
     health_path = RAIZ / "config" / "salud_tiendas.json"
     salud = {}
