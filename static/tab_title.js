@@ -15,20 +15,6 @@
         '37 Bytes':'37bytes.com.ar','Click Gaming':'clickgaming.com.ar','Dinobyte':'dinobyte.ar','GoldenTech Store':'goldentechstore.com.ar','HF Tecnologia':'hftecnologia.com.ar','Max Tecno':'maxtecno.com.ar','Portal Tech & Gaming':'portaltechgaming.com.ar','SCP Hardstore':'scphardstore.com','The Gamer Shop':'thegamershop.com.ar','Vertex Retail':'vertexretail.com.ar','WIZ TECH':'wiztech.com.ar'
     };
 
-    const faltantes = [
-        ['37 Bytes','37bytes.com.ar','37bytes_com_ar'],
-        ['Click Gaming','clickgaming.com.ar','clickgaming_com_ar'],
-        ['Dinobyte','dinobyte.ar','dinobyte_ar'],
-        ['GoldenTech Store','goldentechstore.com.ar','goldentechstore_com_ar'],
-        ['HF Tecnologia','hftecnologia.com.ar','hftecnologia_com_ar'],
-        ['Max Tecno','maxtecno.com.ar','maxtecno_com_ar'],
-        ['Portal Tech & Gaming','portaltechgaming.com.ar','portaltechgaming_com_ar'],
-        ['SCP Hardstore','scphardstore.com','scphardstore_com'],
-        ['The Gamer Shop','thegamershop.com.ar','thegamershop_com_ar'],
-        ['Vertex Retail','vertexretail.com.ar','vertexretail_com_ar'],
-        ['WIZ TECH','wiztech.com.ar','wiztech_com_ar']
-    ];
-
     function aplicarLogo() {
         document.querySelectorAll('.brand-mark').forEach(function (elemento) {
             elemento.innerHTML = `
@@ -80,39 +66,6 @@
         });
     }
 
-    function agregarTiendasFaltantes() {
-        const grid = document.querySelector('.store-grid-more');
-        if (!grid) return;
-
-        faltantes.forEach(function ([nombre, dominio, clave]) {
-            const existe = Array.from(grid.querySelectorAll('.store-card')).some(function (card) {
-                const titulo = card.querySelector('strong');
-                return titulo && titulo.textContent.trim().toLowerCase() === nombre.toLowerCase();
-            });
-            if (existe) return;
-
-            const card = document.createElement('a');
-            card.className = 'store-card';
-            card.href = `/?tienda=${encodeURIComponent(clave)}`;
-            card.innerHTML = `
-                <span class="store-logo-wrap">
-                    <img class="store-logo" src="https://www.${dominio}/favicon.ico" alt="Logo ${nombre}" loading="lazy" referrerpolicy="no-referrer">
-                    <span class="store-badge store-fallback" style="display:none">${nombre.charAt(0).toUpperCase()}</span>
-                </span>
-                <div><strong>${nombre}</strong><small>0 productos</small></div>
-                <span class="store-arrow">→</span>`;
-            grid.appendChild(card);
-        });
-
-        corregirLogos();
-        const summary = document.querySelector('.stores-more summary');
-        const count = document.querySelectorAll('.store-logo-strip .store-logo-card').length + document.querySelectorAll('.store-grid-more .store-card').length;
-        if (summary) {
-            const span = summary.querySelector('span');
-            if (span) span.textContent = `· ${count} tiendas`;
-        }
-    }
-
     let indice = 0;
     let temporizador = null;
 
@@ -123,7 +76,6 @@
 
     function iniciarTituloDinamico() {
         aplicarLogo();
-        agregarTiendasFaltantes();
         corregirLogos();
         cambiarTitulo();
         temporizador = window.setInterval(cambiarTitulo, 2200);
