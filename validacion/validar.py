@@ -1,6 +1,8 @@
 """Validador de catálogos con control de cobertura y calidad."""
 import json
 import os
+import re
+from urllib.parse import urlsplit, urlunsplit
 
 CAIDA_MAXIMA_PERMITIDA = 0.20
 COBERTURA_MINIMA_PUBLICABLE = 0.98
@@ -22,7 +24,16 @@ def _clave(p):
     return str(p.get("id_producto") or p.get("url") or "").strip()
 
 
-def _limpiar(productos):
+def _url_normalizada(valor):
+    try:
+        parsed = urlsplit(str(valor or "").strip())
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc: return None
+        return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path or "/", parsed.query, ""))
+    except ValueError:
+        return None
+
+
+def _limpiar(productos, tienda=""):
     vistos = set()
     limpios = []
     duplicados = 0
@@ -30,20 +41,28 @@ def _limpiar(productos):
     for p in productos or []:
         if not isinstance(p, dict):
             continue
-        clave = _clave(p)
+        nombre = re.sub(r"\s+", " ", str(p.get("nombre") or "")).strip()
+        url = _url_normalizada(p.get("url"))
+        clave = str(p.get("id_producto") or url or "").strip()
         try:
             precio = int(float(p.get("precio")))
         except (TypeError, ValueError):
             precio = 0
-        if not clave or precio < PRECIO_MINIMO_RAZONABLE:
+        if not clave or not nombre or not url or precio < PRECIO_MINIMO_RAZONABLE:
             descartados += 1
             continue
         if clave in vistos:
             duplicados += 1
             continue
         vistos.add(clave)
+        p = dict(p)
+        p["tienda"] = str(p.get("tienda") or tienda).strip() or tienda
+        p["nombre"] = nombre
+        p["url"] = url
+        p["id_producto"] = clave
         p["precio"] = precio
-        p.setdefault("stock", 0)
+        try: p["stock"] = 1 if int(p.get("stock", 0) or 0) > 0 else 0
+        except (TypeError, ValueError): p["stock"] = 0
         limpios.append(p)
     return limpios, duplicados, descartados
 
@@ -113,7 +132,7 @@ def validar_resultado(resultado, path_json):
     warnings = list(resultado.get("warnings") or [])
     anterior = cargar_json_anterior(path_json)
     cantidad_anterior = len(anterior)
-    nuevos, duplicados, descartados = _limpiar(resultado.get("productos") or [])
+    nuevos, duplicados, descartados = _limpiar(resultado.get("productos") or [], tienda)
     if duplicados:
         warnings.append(f"{duplicados} duplicados eliminados")
     if descartados:

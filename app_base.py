@@ -32,6 +32,16 @@ try:
         LOGOS_TIENDAS = json.load(f)
 except (OSError, json.JSONDecodeError):
     LOGOS_TIENDAS = {}
+
+def _datos_tienda(tienda):
+    """Optional metadata in the extractor registry; never blocks a new store."""
+    try:
+        with open(os.path.join("config", "tiendas_auto.json"), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        entry = data.get(str(tienda or "").strip(), {}) if isinstance(data, dict) else {}
+        return entry if isinstance(entry, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
 CATEGORIAS = [("Placas de video", ("rtx", "gtx", "rx ", "radeon", "geforce", "placa de video", "gpu", "vga ")), ("Procesadores", ("procesador", "cpu", "ryzen", "core i3", "core i5", "core i7", "core i9", "threadripper", "athlon", "pentium", "celeron")), ("Motherboards", ("motherboard", "mother", "placa madre", "mainboard", "a520", "a620", "b450", "b550", "b650", "x570", "x670", "x870", "z690", "z790", "z890", "h610", "h770", "h810")), ("Memorias RAM", ("memoria ram", "ram ddr", "ddr3", "ddr4", "ddr5", "sodimm", "dimm ")), ("Almacenamiento", ("ssd", "nvme", "m.2", "disco rigido", "disco duro", "hdd", "sata", "pendrive", "memoria usb")), ("Fuentes", ("fuente de alimentacion", "fuente atx", "fuente modular", "fuente 80", "psu ", "power supply")), ("Gabinetes", ("gabinete", "case pc", "chasis pc", "mid tower", "full tower")), ("Refrigeración", ("watercooler", "water cooling", "watercooling", "cooler cpu", "disipador", "refrigeracion", "fan ", "pasta termica")), ("Monitores", ("monitor", "display ", "pantalla ", "ultrawide")), ("Notebooks", ("notebook", "laptop", "ultrabook")), ("PC armadas", ("pc armada", "computadora gamer", "pc gamer", "desktop gamer", "pc de escritorio", "all in one")), ("Teclados", ("teclado", "keyboard")), ("Mouse", ("mouse", "raton")), ("Auriculares", ("auricular", "headset", "headphone", "earbuds")), ("Micrófonos", ("microfono", "microphone")), ("Webcams", ("webcam", "camara web", "camara usb")), ("Joysticks y controles", ("joystick", "gamepad", "control xbox", "control ps5", "dualshock", "dualsense")), ("Impresoras", ("impresora", "multifuncion", "laserjet", "inkjet")), ("Redes y WiFi", ("router", "wifi", "wi-fi", "access point", "switch de red", "switch gigabit", "repetidor", "mesh", "adaptador wifi")), ("Accesorios", ("hub usb", "adaptador", "cable hdmi", "cable displayport", "cable usb", "lector de tarjetas", "dock ", "soporte de monitor", "soporte notebook"))]
 
 def imagen_utilizable(imagen):
@@ -50,11 +60,15 @@ def logo_tienda_url(tienda):
     clave = str(tienda or "").strip()
     override = LOGOS_TIENDAS.get(clave)
     if override: return override
-    dominio = DOMINIOS_TIENDAS.get(clave)
+    datos = _datos_tienda(clave)
+    if datos.get("logo"): return str(datos["logo"])
+    dominio = DOMINIOS_TIENDAS.get(clave) or urlparse(str(datos.get("url") or "")).netloc
     return f"https://www.google.com/s2/favicons?domain={dominio}&sz=128" if dominio else ""
 
 def nombre_tienda_visible(tienda):
     clave = str(tienda or "").strip()
+    nombre_configurado = _datos_tienda(clave).get("nombre")
+    if nombre_configurado: return str(nombre_configurado).strip()
     if clave in NOMBRES_TIENDAS: return NOMBRES_TIENDAS[clave]
     texto = clave
     for sufijo in ("_com_ar", "_com", "_ar", ".com.ar", ".com"):
