@@ -2,11 +2,11 @@
   "compragamer": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 1750,
-    "productos_nuevos": 2,
-    "productos_actualizados": 2,
-    "productos_eliminados": 6,
+    "productos_nuevos": 4,
+    "productos_actualizados": 0,
+    "productos_eliminados": 4,
     "expected_product_urls": null,
     "extracted_product_urls": null,
     "coverage": null,
@@ -17,31 +17,31 @@
     ]
   },
   "mexx": {
-    "salud": "HEALTHY",
-    "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "salud": "FAILED",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 57,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
-    "productos_eliminados": 0,
+    "productos_eliminados": 57,
     "expected_product_urls": null,
     "extracted_product_urls": null,
     "coverage": null,
-    "fuente": "extraccion_nueva",
+    "fuente": "catalogo_anterior",
     "warnings": [
       "Log detallado: logs_auto/mexx_scrapy.log",
-      "12 duplicados eliminados"
+      "Extracción no utilizable; se conserva el catálogo anterior (57)"
     ]
   },
   "venex": {
     "salud": "FAILED",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 1719,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
     "productos_eliminados": 1719,
-    "expected_product_urls": 1757,
+    "expected_product_urls": 1756,
     "extracted_product_urls": 0,
     "coverage": 0.0,
     "fuente": "catalogo_anterior",
@@ -53,11 +53,11 @@
   "puertominero": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 75,
-    "productos_nuevos": 4,
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 76,
+    "productos_nuevos": 1,
     "productos_actualizados": 0,
-    "productos_eliminados": 1,
+    "productos_eliminados": 0,
     "expected_product_urls": null,
     "extracted_product_urls": null,
     "coverage": null,
@@ -69,10 +69,10 @@
   "Quantum Hardstore": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 2338,
     "productos_nuevos": 0,
-    "productos_actualizados": 0,
+    "productos_actualizados": 1,
     "productos_eliminados": 0,
     "expected_product_urls": null,
     "extracted_product_urls": null,
@@ -83,7 +83,7 @@
   "Logg": {
     "salud": "FAILED",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 100,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -100,13 +100,13 @@
   "Maximus": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 1338,
-    "productos_nuevos": 6,
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 1332,
+    "productos_nuevos": 0,
     "productos_actualizados": 0,
-    "productos_eliminados": 7,
-    "expected_product_urls": 1338,
-    "extracted_product_urls": 1338,
+    "productos_eliminados": 6,
+    "expected_product_urls": 1332,
+    "extracted_product_urls": 1332,
     "coverage": 1.0,
     "fuente": "extraccion_nueva",
     "warnings": []
@@ -114,7 +114,7 @@
   "armytech_com_ar": {
     "salud": "NO_SOURCE",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 299,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -131,7 +131,7 @@
   "fullh4rd_com_ar": {
     "salud": "NO_SOURCE",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 214,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -145,27 +145,10 @@
       "Extracción no utilizable; se conserva el catálogo anterior (214)"
     ]
   },
-  "gamerfactory_com_ar": {
-    "salud": "NO_SOURCE",
-    "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 0,
-    "productos_nuevos": 0,
-    "productos_actualizados": 0,
-    "productos_eliminados": 0,
-    "expected_product_urls": 0,
-    "extracted_product_urls": 0,
-    "coverage": 0.0,
-    "fuente": "sin_catalogo",
-    "warnings": [
-      "Log detallado: logs_auto/gamerfactory_com_ar.log",
-      "No existe catálogo anterior para usar como fallback"
-    ]
-  },
   "clickgaming_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 1873,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -180,28 +163,45 @@
       "No se reemplaza el catálogo: extracción parcial/incompleta (261 nuevos vs 1873 anteriores)."
     ]
   },
+  "gamerfactory_com_ar": {
+    "salud": "NO_SOURCE",
+    "completitud": "baja",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 0,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 0,
+    "expected_product_urls": 0,
+    "extracted_product_urls": 0,
+    "coverage": 0.0,
+    "fuente": "sin_catalogo",
+    "warnings": [
+      "Log detallado: logs_auto/gamerfactory_com_ar.log",
+      "No existe catálogo anterior para usar como fallback"
+    ]
+  },
   "gamingcity_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 1985,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
     "productos_eliminados": 0,
     "expected_product_urls": 0,
-    "extracted_product_urls": 125,
+    "extracted_product_urls": 124,
     "coverage": 1.0,
     "fuente": "fusion_parcial",
     "warnings": [
       "Log detallado: logs_auto/gamingcity_com_ar.log",
-      "Caída sospechosa de catálogo: 125 vs 1985 anteriores (6.3%)",
-      "No se reemplaza el catálogo: extracción parcial/incompleta (125 nuevos vs 1985 anteriores)."
+      "Caída sospechosa de catálogo: 124 vs 1985 anteriores (6.2%)",
+      "No se reemplaza el catálogo: extracción parcial/incompleta (124 nuevos vs 1985 anteriores)."
     ]
   },
   "compufanstore_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 113,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -218,7 +218,7 @@
   "hardcorecomputacion_com_ar": {
     "salud": "NO_SOURCE",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 295,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -233,30 +233,33 @@
     ]
   },
   "37bytes_com_ar": {
-    "salud": "HEALTHY",
-    "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "salud": "PARTIAL",
+    "completitud": "media",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 55,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
     "productos_eliminados": 0,
     "expected_product_urls": 235,
-    "extracted_product_urls": 236,
-    "coverage": 1.004255319148936,
-    "fuente": "extraccion_nueva",
+    "extracted_product_urls": 126,
+    "coverage": 0.5361702127659574,
+    "fuente": "fusion_parcial",
     "warnings": [
+      "Cobertura de fichas 53.6% (126/235)",
       "Log detallado: logs_auto/37bytes_com_ar.log",
-      "201 duplicados eliminados"
+      "106 duplicados eliminados",
+      "Cobertura insuficiente: 53.6% (126 / 235)",
+      "No se reemplaza el catálogo: extracción parcial/incompleta (40 nuevos vs 55 anteriores)."
     ]
   },
   "backupcomputacion_com": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 38,
-    "productos_nuevos": 20,
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 36,
+    "productos_nuevos": 15,
     "productos_actualizados": 0,
-    "productos_eliminados": 20,
+    "productos_eliminados": 17,
     "expected_product_urls": 0,
     "extracted_product_urls": 0,
     "coverage": 1.0,
@@ -265,26 +268,26 @@
       "Log detallado: logs_auto/backupcomputacion_com.log"
     ]
   },
-  "710tech_com_ar": {
+  "hypergaming_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 374,
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 369,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
-    "productos_eliminados": 0,
+    "productos_eliminados": 1,
     "expected_product_urls": 0,
     "extracted_product_urls": 0,
     "coverage": 1.0,
     "fuente": "extraccion_nueva",
     "warnings": [
-      "Log detallado: logs_auto/710tech_com_ar.log"
+      "Log detallado: logs_auto/hypergaming_com_ar.log"
     ]
   },
   "katech_com_ar": {
     "salud": "NO_SOURCE",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 3700,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -298,11 +301,11 @@
       "Extracción no utilizable; se conserva el catálogo anterior (3700)"
     ]
   },
-  "hypergaming_com_ar": {
+  "710tech_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 370,
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 374,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
     "productos_eliminados": 0,
@@ -311,13 +314,13 @@
     "coverage": 1.0,
     "fuente": "extraccion_nueva",
     "warnings": [
-      "Log detallado: logs_auto/hypergaming_com_ar.log"
+      "Log detallado: logs_auto/710tech_com_ar.log"
     ]
   },
   "gezatek_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 1060,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -333,7 +336,7 @@
   "megasoftargentina_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 214,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -350,7 +353,7 @@
   "mymcomputacion_com": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 659,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -366,43 +369,27 @@
   "insumosacuario_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 866,
-    "productos_nuevos": 2,
-    "productos_actualizados": 6,
-    "productos_eliminados": 10,
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 873,
+    "productos_nuevos": 8,
+    "productos_actualizados": 2,
+    "productos_eliminados": 1,
     "expected_product_urls": 0,
     "extracted_product_urls": 0,
     "coverage": 1.0,
     "fuente": "extraccion_nueva",
     "warnings": [
       "Log detallado: logs_auto/insumosacuario_com_ar.log",
-      "7 duplicados eliminados"
-    ]
-  },
-  "goldentechstore_com_ar": {
-    "salud": "HEALTHY",
-    "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 1638,
-    "productos_nuevos": 0,
-    "productos_actualizados": 5,
-    "productos_eliminados": 1,
-    "expected_product_urls": 0,
-    "extracted_product_urls": 1638,
-    "coverage": 1.0,
-    "fuente": "extraccion_nueva",
-    "warnings": [
-      "Log detallado: logs_auto/goldentechstore_com_ar.log"
+      "8 duplicados eliminados"
     ]
   },
   "netgaming_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 1356,
     "productos_nuevos": 0,
-    "productos_actualizados": 0,
+    "productos_actualizados": 1,
     "productos_eliminados": 0,
     "expected_product_urls": 0,
     "extracted_product_urls": 0,
@@ -415,24 +402,40 @@
   "integradosargentinos_com": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 696,
     "productos_nuevos": 0,
-    "productos_actualizados": 0,
+    "productos_actualizados": 1,
     "productos_eliminados": 0,
     "expected_product_urls": 699,
-    "extracted_product_urls": 701,
-    "coverage": 1.0028612303290414,
+    "extracted_product_urls": 702,
+    "coverage": 1.0042918454935623,
     "fuente": "extraccion_nueva",
     "warnings": [
       "Log detallado: logs_auto/integradosargentinos_com.log",
-      "72 duplicados eliminados"
+      "79 duplicados eliminados"
+    ]
+  },
+  "goldentechstore_com_ar": {
+    "salud": "HEALTHY",
+    "completitud": "alta",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 1638,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 0,
+    "expected_product_urls": 0,
+    "extracted_product_urls": 1638,
+    "coverage": 1.0,
+    "fuente": "extraccion_nueva",
+    "warnings": [
+      "Log detallado: logs_auto/goldentechstore_com_ar.log"
     ]
   },
   "portalstore_com_ar": {
     "salud": "NO_SOURCE",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 11,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -449,11 +452,11 @@
   "noxiestore_com": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 249,
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 248,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
-    "productos_eliminados": 0,
+    "productos_eliminados": 1,
     "expected_product_urls": 0,
     "extracted_product_urls": 0,
     "coverage": 1.0,
@@ -463,47 +466,10 @@
       "2 duplicados eliminados"
     ]
   },
-  "dinobyte_ar": {
-    "salud": "PARTIAL",
-    "completitud": "media",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 2645,
-    "productos_nuevos": 4,
-    "productos_actualizados": 17,
-    "productos_eliminados": 0,
-    "expected_product_urls": 0,
-    "extracted_product_urls": 2020,
-    "coverage": 1.0,
-    "fuente": "fusion_parcial",
-    "warnings": [
-      "Log detallado: logs_auto/dinobyte_ar.log",
-      "No se reemplaza el catálogo: extracción parcial/incompleta (2020 nuevos vs 2641 anteriores)."
-    ]
-  },
-  "empeniogamer_com_ar": {
-    "salud": "PARTIAL",
-    "completitud": "media",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 2994,
-    "productos_nuevos": 0,
-    "productos_actualizados": 0,
-    "productos_eliminados": 0,
-    "expected_product_urls": 2921,
-    "extracted_product_urls": 786,
-    "coverage": 0.2690859294762068,
-    "fuente": "fusion_parcial",
-    "warnings": [
-      "Presupuesto agotado: 835 requests, 0 páginas",
-      "Log detallado: logs_auto/empeniogamer_com_ar.log",
-      "Cobertura insuficiente: 26.9% (786 / 2921)",
-      "767/787 productos sin imagen (>70%)",
-      "No se reemplaza el catálogo: extracción parcial/incompleta (787 nuevos vs 2994 anteriores)."
-    ]
-  },
   "shopgamer_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 3215,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -521,11 +487,11 @@
   "rockethard_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 513,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
-    "productos_eliminados": 1,
+    "productos_eliminados": 0,
     "expected_product_urls": 0,
     "extracted_product_urls": 0,
     "coverage": 1.0,
@@ -534,67 +500,100 @@
       "Log detallado: logs_auto/rockethard_com_ar.log"
     ]
   },
-  "liontech_gaming_com": {
-    "salud": "PARTIAL",
-    "completitud": "media",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 2093,
+  "scphardstore_com": {
+    "salud": "HEALTHY",
+    "completitud": "alta",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 816,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
     "productos_eliminados": 0,
-    "expected_product_urls": 5770,
-    "extracted_product_urls": 493,
-    "coverage": 0.0854419410745234,
+    "expected_product_urls": 0,
+    "extracted_product_urls": 72,
+    "coverage": 1.0,
     "fuente": "fusion_parcial",
     "warnings": [
-      "Presupuesto agotado: 620 requests, 0 páginas",
-      "Log detallado: logs_auto/liontech_gaming_com.log",
-      "3 duplicados eliminados",
-      "Cobertura insuficiente: 8.5% (493 / 5770)",
-      "No se reemplaza el catálogo: extracción parcial/incompleta (490 nuevos vs 2093 anteriores)."
+      "Log detallado: logs_auto/scphardstore_com.log",
+      "Caída sospechosa de catálogo: 72 vs 816 anteriores (8.8%)",
+      "No se reemplaza el catálogo: extracción parcial/incompleta (72 nuevos vs 816 anteriores)."
     ]
   },
-  "necxus_com_ar": {
-    "salud": "PARTIAL",
-    "completitud": "media",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 2892,
+  "silverhard_com": {
+    "salud": "HEALTHY",
+    "completitud": "alta",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 1922,
     "productos_nuevos": 0,
-    "productos_actualizados": 8,
+    "productos_actualizados": 0,
     "productos_eliminados": 0,
-    "expected_product_urls": 2943,
-    "extracted_product_urls": 1601,
-    "coverage": 0.544002718314645,
+    "expected_product_urls": 0,
+    "extracted_product_urls": 168,
+    "coverage": 1.0,
     "fuente": "fusion_parcial",
     "warnings": [
-      "Presupuesto agotado: 1611 requests, 0 páginas",
-      "Log detallado: logs_auto/necxus_com_ar.log",
-      "102 duplicados eliminados",
-      "Cobertura insuficiente: 54.4% (1601 / 2943)",
-      "No se reemplaza el catálogo: extracción parcial/incompleta (1499 nuevos vs 2892 anteriores)."
+      "Log detallado: logs_auto/silverhard_com.log",
+      "Caída sospechosa de catálogo: 168 vs 1922 anteriores (8.7%)",
+      "No se reemplaza el catálogo: extracción parcial/incompleta (168 nuevos vs 1922 anteriores)."
     ]
   },
   "ngtechnologies_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 1138,
-    "productos_nuevos": 1,
-    "productos_actualizados": 62,
-    "productos_eliminados": 2,
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 1139,
+    "productos_nuevos": 2,
+    "productos_actualizados": 114,
+    "productos_eliminados": 1,
     "expected_product_urls": 1187,
     "extracted_product_urls": 1188,
     "coverage": 1.0008424599831507,
     "fuente": "extraccion_nueva",
     "warnings": [
       "Log detallado: logs_auto/ngtechnologies_com_ar.log",
-      "88 duplicados eliminados"
+      "87 duplicados eliminados"
+    ]
+  },
+  "dinobyte_ar": {
+    "salud": "PARTIAL",
+    "completitud": "media",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 2645,
+    "productos_nuevos": 0,
+    "productos_actualizados": 1,
+    "productos_eliminados": 0,
+    "expected_product_urls": 0,
+    "extracted_product_urls": 2040,
+    "coverage": 1.0,
+    "fuente": "fusion_parcial",
+    "warnings": [
+      "Log detallado: logs_auto/dinobyte_ar.log",
+      "No se reemplaza el catálogo: extracción parcial/incompleta (2040 nuevos vs 2645 anteriores)."
+    ]
+  },
+  "empeniogamer_com_ar": {
+    "salud": "PARTIAL",
+    "completitud": "media",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 2996,
+    "productos_nuevos": 2,
+    "productos_actualizados": 0,
+    "productos_eliminados": 0,
+    "expected_product_urls": 2921,
+    "extracted_product_urls": 1335,
+    "coverage": 0.45703526189661076,
+    "fuente": "fusion_parcial",
+    "warnings": [
+      "Presupuesto agotado: 1393 requests, 0 páginas",
+      "Log detallado: logs_auto/empeniogamer_com_ar.log",
+      "Cobertura insuficiente: 45.7% (1335 / 2921)",
+      "1296/1336 productos sin imagen (>70%)",
+      "No se reemplaza el catálogo: extracción parcial/incompleta (1336 nuevos vs 2994 anteriores)."
     ]
   },
   "wiztech_com_ar": {
     "salud": "NO_SOURCE",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 0,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -611,7 +610,7 @@
   "xt_pc_com_ar": {
     "salud": "NO_SOURCE",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 187,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -628,7 +627,7 @@
   "vrx_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 128,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -642,14 +641,34 @@
       "13 duplicados eliminados"
     ]
   },
+  "liontech_gaming_com": {
+    "salud": "PARTIAL",
+    "completitud": "media",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 2093,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
+    "productos_eliminados": 0,
+    "expected_product_urls": 5770,
+    "extracted_product_urls": 455,
+    "coverage": 0.07885615251299827,
+    "fuente": "fusion_parcial",
+    "warnings": [
+      "Presupuesto agotado: 577 requests, 0 páginas",
+      "Log detallado: logs_auto/liontech_gaming_com.log",
+      "2 duplicados eliminados",
+      "Cobertura insuficiente: 7.9% (455 / 5770)",
+      "No se reemplaza el catálogo: extracción parcial/incompleta (453 nuevos vs 2093 anteriores)."
+    ]
+  },
   "spacegamer_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 35,
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 33,
     "productos_nuevos": 20,
     "productos_actualizados": 0,
-    "productos_eliminados": 19,
+    "productos_eliminados": 22,
     "expected_product_urls": 0,
     "extracted_product_urls": 0,
     "coverage": 1.0,
@@ -658,29 +677,33 @@
       "Log detallado: logs_auto/spacegamer_com_ar.log"
     ]
   },
-  "scphardstore_com": {
-    "salud": "HEALTHY",
-    "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 816,
-    "productos_nuevos": 504,
-    "productos_actualizados": 1,
+  "necxus_com_ar": {
+    "salud": "PARTIAL",
+    "completitud": "media",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
+    "productos": 2892,
+    "productos_nuevos": 0,
+    "productos_actualizados": 14,
     "productos_eliminados": 0,
-    "expected_product_urls": 0,
-    "extracted_product_urls": 816,
-    "coverage": 1.0,
-    "fuente": "extraccion_nueva",
+    "expected_product_urls": 2943,
+    "extracted_product_urls": 2571,
+    "coverage": 0.873598369011213,
+    "fuente": "fusion_parcial",
     "warnings": [
-      "Log detallado: logs_auto/scphardstore_com.log"
+      "Presupuesto agotado: 2581 requests, 0 páginas",
+      "Log detallado: logs_auto/necxus_com_ar.log",
+      "186 duplicados eliminados",
+      "Cobertura insuficiente: 87.4% (2571 / 2943)",
+      "No se reemplaza el catálogo: extracción parcial/incompleta (2385 nuevos vs 2892 anteriores)."
     ]
   },
   "slot_one_com_ar": {
     "salud": "HEALTHY",
     "completitud": "alta",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 857,
-    "productos_nuevos": 7,
-    "productos_actualizados": 3,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
     "productos_eliminados": 0,
     "expected_product_urls": 848,
     "extracted_product_urls": 848,
@@ -691,27 +714,10 @@
       "47 duplicados eliminados"
     ]
   },
-  "silverhard_com": {
-    "salud": "PARTIAL",
-    "completitud": "media",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
-    "productos": 1922,
-    "productos_nuevos": 48,
-    "productos_actualizados": 15,
-    "productos_eliminados": 0,
-    "expected_product_urls": 0,
-    "extracted_product_urls": 1920,
-    "coverage": 1.0,
-    "fuente": "fusion_parcial",
-    "warnings": [
-      "Log detallado: logs_auto/silverhard_com.log",
-      "No se reemplaza el catálogo: extracción parcial/incompleta (1920 nuevos vs 1874 anteriores)."
-    ]
-  },
   "thegamershop_com_ar": {
     "salud": "NO_SOURCE",
     "completitud": "baja",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 2724,
     "productos_nuevos": 0,
     "productos_actualizados": 0,
@@ -728,38 +734,38 @@
   "universosgamers_com_ar": {
     "salud": "PARTIAL",
     "completitud": "media",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 2610,
     "productos_nuevos": 0,
-    "productos_actualizados": 13,
+    "productos_actualizados": 15,
     "productos_eliminados": 0,
     "expected_product_urls": 2324,
-    "extracted_product_urls": 1403,
-    "coverage": 0.6037005163511188,
+    "extracted_product_urls": 746,
+    "coverage": 0.32099827882960413,
     "fuente": "fusion_parcial",
     "warnings": [
-      "Presupuesto agotado: 1420 requests, 0 páginas",
+      "Presupuesto agotado: 763 requests, 0 páginas",
       "Log detallado: logs_auto/universosgamers_com_ar.log",
-      "Cobertura insuficiente: 60.4% (1403 / 2324)",
-      "1403/1403 productos sin imagen (>70%)",
-      "No se reemplaza el catálogo: extracción parcial/incompleta (1403 nuevos vs 2610 anteriores)."
+      "Cobertura insuficiente: 32.1% (746 / 2324)",
+      "746/746 productos sin imagen (>70%)",
+      "No se reemplaza el catálogo: extracción parcial/incompleta (746 nuevos vs 2610 anteriores)."
     ]
   },
   "maxtecno_com_ar": {
     "salud": "PARTIAL",
     "completitud": "media",
-    "ultima_ejecucion": "2026-10-11T09:14:33",
+    "ultima_ejecucion": "2026-10-11T15:59:56",
     "productos": 3196,
-    "productos_nuevos": 29,
-    "productos_actualizados": 65,
+    "productos_nuevos": 0,
+    "productos_actualizados": 0,
     "productos_eliminados": 0,
     "expected_product_urls": 0,
-    "extracted_product_urls": 2368,
+    "extracted_product_urls": 2218,
     "coverage": 1.0,
     "fuente": "fusion_parcial",
     "warnings": [
       "Log detallado: logs_auto/maxtecno_com_ar.log",
-      "No se reemplaza el catálogo: extracción parcial/incompleta (2368 nuevos vs 3167 anteriores)."
+      "No se reemplaza el catálogo: extracción parcial/incompleta (2218 nuevos vs 3196 anteriores)."
     ]
   }
 }
